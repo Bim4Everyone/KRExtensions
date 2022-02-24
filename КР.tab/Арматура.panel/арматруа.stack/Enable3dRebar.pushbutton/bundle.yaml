@@ -1,0 +1,9 @@
+title:
+  ru: Включить 3d арматуру
+  en_us: Enable 3D rebar
+
+tooltip:
+  ru: Включает отображение 3D арматуры на текущем 3D виде
+  en_us: Enables the display of 3D reinforcement in the current 3D view.
+
+author: dosymep

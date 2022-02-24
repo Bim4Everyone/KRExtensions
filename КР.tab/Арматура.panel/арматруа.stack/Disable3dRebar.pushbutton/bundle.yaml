@@ -1,0 +1,9 @@
+title:
+  ru: Отключить 3d арматуру
+  en_us: Disable 3D rebar
+
+tooltip:
+  ru: Отключает отображение 3D арматуры на текущем 3D виде
+  en_us: Disables the display of 3D reinforcement in the current 3D view.
+
+author: dosymep
