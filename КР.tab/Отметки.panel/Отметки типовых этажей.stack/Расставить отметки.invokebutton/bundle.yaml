@@ -1,0 +1,10 @@
+title:
+  ru: Расставить отметки
+  en_us: Place annotations
+
+tooltip:
+  ru: Расставляет отметок типовых этажей над высотными отметками
+  en_us: Place annotations above spot dimentions
+
+assembly: RevitMarkPlacement.dll
+command_class: PlaceAnnotationCommand

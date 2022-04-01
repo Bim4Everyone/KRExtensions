@@ -1,0 +1,10 @@
+title:
+  ru: Обновить отметки
+  en_us: Update annotations
+
+tooltip:
+  ru: Обновляет отметки типовых этажей
+  en_us: Update annotations
+
+assembly: RevitMarkPlacement.dll
+command_class: UpdateAnnotationsCommand
