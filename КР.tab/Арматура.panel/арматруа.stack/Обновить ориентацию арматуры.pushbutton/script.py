@@ -17,6 +17,8 @@ from Autodesk.Revit.DB import *
 from Autodesk.Revit.DB.Structure import *
 
 from pyrevit import forms
+from pyrevit import EXEC_PARAMS
+from dosymep_libs.bim4everyone import *
 
 
 application = __revit__.Application
@@ -104,30 +106,35 @@ class RebarElement:
         return True
 
 
-category_list = List[Type]()
-category_list.Add(Rebar)
-category_list.Add(RebarInSystem)
+@log_plugin(EXEC_PARAMS.command_name)
+def script_execute(plugin_logger):
+    category_list = List[Type]()
+    category_list.Add(Rebar)
+    category_list.Add(RebarInSystem)
 
-category_filter = ElementMulticlassFilter(category_list)
-elements = FilteredElementCollector(document, document.ActiveView.Id)\
-    .WherePasses(category_filter)\
-    .WhereElementIsNotElementType()\
-    .ToElements()
+    category_filter = ElementMulticlassFilter(category_list)
+    elements = FilteredElementCollector(document, document.ActiveView.Id)\
+        .WherePasses(category_filter)\
+        .WhereElementIsNotElementType()\
+        .ToElements()
 
-rebar_elements = [ RebarElement(element) for element in elements ]
-rebar_elements = [ element for element in rebar_elements
-                   if element.HostCategory.Id == ElementId(BuiltInCategory.OST_Walls)
-                   or element.HostCategory.Id == ElementId(BuiltInCategory.OST_Columns)
-                   or element.HostCategory.Id == ElementId(BuiltInCategory.OST_StructuralColumns)]
+    rebar_elements = [ RebarElement(element) for element in elements ]
+    rebar_elements = [ element for element in rebar_elements
+                       if element.HostCategory.Id == ElementId(BuiltInCategory.OST_Walls)
+                       or element.HostCategory.Id == ElementId(BuiltInCategory.OST_Columns)
+                       or element.HostCategory.Id == ElementId(BuiltInCategory.OST_StructuralColumns)]
 
-with Transaction(document) as transaction:
-    transaction.Start("Обновление ориентации арматуры")
+    with Transaction(document) as transaction:
+        transaction.Start("Обновление ориентации арматуры")
 
-    for rebar in rebar_elements:
-        host_mark = rebar.Element.GetParamValueOrDefault(BuiltInParameter.REBAR_ELEM_HOST_MARK)
-        rebar.Element.SetParamValue("Мрк.МаркаКонструкции", host_mark)
-        if rebar.IsAllowProcess:
-            structure_mark = "{}{}".format(host_mark, "_Вертик" if rebar.ZIsLonger else "_Гориз")
-            rebar.Element.SetParamValue("Мрк.МаркаКонструкции", structure_mark)
+        for rebar in rebar_elements:
+            host_mark = rebar.Element.GetParamValueOrDefault(BuiltInParameter.REBAR_ELEM_HOST_MARK)
+            rebar.Element.SetParamValue("Мрк.МаркаКонструкции", host_mark)
+            if rebar.IsAllowProcess:
+                structure_mark = "{}{}".format(host_mark, "_Вертик" if rebar.ZIsLonger else "_Гориз")
+                rebar.Element.SetParamValue("Мрк.МаркаКонструкции", structure_mark)
 
-    transaction.Commit()
+        transaction.Commit()
+
+
+script_execute()
