@@ -106,6 +106,7 @@ class RebarElement:
         return True
 
 
+@notification()
 @log_plugin(EXEC_PARAMS.command_name)
 def script_execute(plugin_logger):
     category_list = List[Type]()
