@@ -40,37 +40,42 @@ class PartsSchedule:
         self.num_param_name = "обр_ФОП_Форма_номер"
         self.posit_param_name = "обр_ФОП_Позиция"
         self.excl_param_name = "обр_ФОП_Исключить из ВД"
+        self.excl_param_field = self.__get_field_by_name(self.excl_param_name)
 
     def check_schedule(self):
-        if not self.__get_field_by_name(self.ifc_img_param_name):
-            return False
-        if not self.__get_field_by_name(self.excl_param_name):
-            return False
-        if not self.__get_field_by_name(self.num_param_name):
-            return False
-        if not self.__get_field_by_name(self.posit_param_name):
-            return False
+        params = [self.ifc_img_param_name,
+                  self.excl_param_name,
+                  self.num_param_name,
+                  self.posit_param_name]
+        for param in params:
+            if not self.__get_field_by_name(param):
+                forms.alert("В выбранной ведомости отсутствуют необходимые параметры", exitscript=True)
+
+        filters = self.schedule.Definition.GetFilters()
+        used_filters = [x for x in filters if x.FieldId == self.excl_param_field.FieldId]
+        if used_filters:
+            forms.alert("В выбранной ведомости уже присутствует фильтр по параметру "
+                        "'обр_ФОП_Исключить из ВД'.\nФильтр требуется удалить.", exitscript=True)
         return True
 
     def update_elements(self):
         with revit.Transaction("BIM: Обновить ведомости"):
             dict_by_number = self.__group_elements()
-            for key in dict_by_number.keys():
-                for key2 in dict_by_number[key].keys():
-                    for key3 in dict_by_number[key][key2].keys():
-                        elements = dict_by_number[key][key2][key3]
+            for number_key in dict_by_number.keys():
+                for position_key in dict_by_number[number_key].keys():
+                    for family_key in dict_by_number[number_key][position_key].keys():
+                        elements = dict_by_number[number_key][position_key][family_key]
                         for element in elements:
                             element.LookupParameter(self.excl_param_name).Set(1)
                         elements[0].LookupParameter(self.excl_param_name).Set(0)
 
     def update_filters(self):
-        field_id = self.__get_field_by_name(self.excl_param_name).FieldId
+        field_id = self.excl_param_field.FieldId
         filter_type = ScheduleFilterType.NotEqual
         filter_value = 1
         schedule_filter = ScheduleFilter(field_id, filter_type, filter_value)
-        if self.__check_filters(field_id, filter_type, filter_value):
-            with revit.Transaction("BIM: Обновить ведомости"):
-                self.schedule.Definition.AddFilter(schedule_filter)
+        with revit.Transaction("BIM: Обновить ведомости"):
+            self.schedule.Definition.AddFilter(schedule_filter)
 
     def __get_schedule_elements(self):
         elements = FilteredElementCollector(self.doc, self.schedule.Id)
@@ -91,20 +96,6 @@ class PartsSchedule:
             type_id = element.GetTypeId()
             element = self.doc.GetElement(type_id)
         return element.LookupParameter(name).AsString()
-
-    def __check_filters(self, field_id, filter_type, value):
-        filters = self.schedule.Definition.GetFilters()
-        used_filters = [x for x in filters if x.FieldId == field_id]
-        if used_filters:
-            if len(used_filters) == 1:
-                if used_filters[0].FilterType == filter_type:
-                    if used_filters[0].IsIntegerValue:
-                        if used_filters[0].GetIntegerValue == value:
-                            return False
-                forms.alert("В выбранной ведомости есть неверный фильтр", exitscript=True)
-            else:
-                forms.alert("В выбранной ведомости уже есть фильтры", exitscript=True)
-        return True
 
     def __group_elements(self):
         dict_by_number = self.__create_dict_by_param(self.elements, self.num_param_name, False)
@@ -152,8 +143,6 @@ def script_execute(plugin_logger):
         if parts_schedule.check_schedule():
             parts_schedule.update_elements()
             parts_schedule.update_filters()
-        else:
-            forms.alert("В выбранной ведомости отсутствуют необходимые параметры", exitscript=True)
 
 
 script_execute()
