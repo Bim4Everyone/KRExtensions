@@ -66,8 +66,8 @@ class PartsSchedule:
                     for family_key in dict_by_number[number_key][position_key].keys():
                         elements = dict_by_number[number_key][position_key][family_key]
                         for element in elements:
-                            element.LookupParameter(self.excl_param_name).Set(1)
-                        elements[0].LookupParameter(self.excl_param_name).Set(0)
+                            element.SetParamValue(self.excl_param_name, 1)
+                        elements[0].SetParamValue(self.excl_param_name, 0)
 
     def update_filters(self):
         field_id = self.excl_param_field.FieldId
@@ -91,11 +91,11 @@ class PartsSchedule:
                     if self.doc.GetElement(field.ParameterId).Name == name:
                         return field
 
-    def __get_param_value(self, element, name, is_inst=True):
+    def __get_param_value(self, element, param_name, is_inst):
         if not is_inst:
             type_id = element.GetTypeId()
             element = self.doc.GetElement(type_id)
-        return element.LookupParameter(name).AsString()
+        return element.GetParamValueOrDefault(param_name)
 
     def __group_elements(self):
         dict_by_number = self.__create_dict_by_param(self.elements, self.num_param_name, False)
@@ -105,7 +105,8 @@ class PartsSchedule:
 
         for key_num in dict_by_number.keys():
             for key_prior in dict_by_number[key_num].keys():
-                dict_by_family = self.__create_dict_by_param(dict_by_number[key_num][key_prior], "Семейство", True)
+                elements = dict_by_number[key_num][key_prior]
+                dict_by_family = self.__create_dict_by_param(elements, BuiltInParameter.ELEM_FAMILY_PARAM, True)
                 dict_by_number[key_num][key_prior] = dict_by_family
 
         for key_num in dict_by_number.keys():
