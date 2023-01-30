@@ -6,6 +6,7 @@ clr.AddReference("dosymep.Bim4Everyone.dll")
 
 from pyrevit import EXEC_PARAMS, revit
 from pyrevit import forms
+from pyrevit import script
 
 from Autodesk.Revit.DB import *
 from Autodesk.Revit.UI.Selection import *
@@ -47,15 +48,25 @@ class PartsSchedule:
                   self.excl_param_name,
                   self.num_param_name,
                   self.posit_param_name]
+        errors = []
         for param in params:
             if not self.__get_field_by_name(param):
-                forms.alert("В выбранной ведомости отсутствуют необходимые параметры", exitscript=True)
+                error_info = ["", param]
+                errors.append(error_info)
+
+        if errors:
+            output = script.get_output()
+            output.print_table(table_data=errors,
+                               title="В выбранной ведомости отсутствуют необходимые параметры:",
+                               columns=["", "Имя параметра"])
+            return False
 
         filters = self.schedule.Definition.GetFilters()
         used_filters = [x for x in filters if x.FieldId == self.excl_param_field.FieldId]
         if used_filters:
             forms.alert("В выбранной ведомости уже присутствует фильтр по параметру "
-                        "'обр_ФОП_Исключить из ВД'.\nФильтр требуется удалить.", exitscript=True)
+                        "'обр_ФОП_Исключить из ВД'.\nФильтр требуется удалить.")
+            return False
         return True
 
     def update_elements(self):
@@ -66,13 +77,17 @@ class PartsSchedule:
                     for family_key in dict_by_number[number_key][position_key].keys():
                         elements = dict_by_number[number_key][position_key][family_key]
                         for element in elements:
-                            element.SetParamValue(self.excl_param_name, 1)
-                        elements[0].SetParamValue(self.excl_param_name, 0)
+                            element.SetParamValue(self.excl_param_name, "0")
+
+                    random_key = dict_by_number[number_key][position_key].keys()[0]
+                    elements_true = dict_by_number[number_key][position_key][random_key]
+                    for element in elements_true:
+                        element.SetParamValue(self.excl_param_name, "1")
 
     def update_filters(self):
         field_id = self.excl_param_field.FieldId
-        filter_type = ScheduleFilterType.NotEqual
-        filter_value = 1
+        filter_type = ScheduleFilterType.Equal
+        filter_value = "1"
         schedule_filter = ScheduleFilter(field_id, filter_type, filter_value)
         with revit.Transaction("BIM: Обновить ведомости"):
             self.schedule.Definition.AddFilter(schedule_filter)
@@ -109,11 +124,6 @@ class PartsSchedule:
                 dict_by_family = self.__create_dict_by_param(elements, BuiltInParameter.ELEM_FAMILY_PARAM, True)
                 dict_by_number[key_num][key_prior] = dict_by_family
 
-        for key_num in dict_by_number.keys():
-            for key_prior in dict_by_number[key_num].keys():
-                if len(dict_by_number[key_num][key_prior].keys()) > 1:
-                    random_key = dict_by_number[key_num][key_prior].keys()[0]
-                    del dict_by_number[key_num][key_prior][random_key]
         return dict_by_number
 
     def __create_dict_by_param(self, elements, param_name, is_inst):
@@ -144,6 +154,8 @@ def script_execute(plugin_logger):
         if parts_schedule.check_schedule():
             parts_schedule.update_elements()
             parts_schedule.update_filters()
+        else:
+            script.exit()
 
 
 script_execute()
