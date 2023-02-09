@@ -73,7 +73,7 @@
                     </GridViewColumn>
                     <GridViewColumn
                         Header="Имя" Width="220"
-                        DisplayMemberBinding="{Binding section_name}"/>
+                        DisplayMemberBinding="{Binding number}"/>
                 </GridView>
             </ListView.View>
         </ListView>
@@ -93,8 +93,8 @@
             <Button
                 Width="100"
                 Margin="10, 0"
-                Command="{Binding delete_names}"
-                Content="Удалить"/>
+                Command="{Binding create_tables_command}"
+                Content="Создать"/>
             <Button
                 Width="100"
                 Content="Отмена"
