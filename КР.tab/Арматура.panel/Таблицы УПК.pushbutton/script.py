@@ -39,23 +39,39 @@ class RevitRepository:
         self.quality_indexes = table_type.quality_indexes
 
         self.__concrete = self.__get_concrete()
+        self.__rebar = self.__get_rebar()
         self.__buildings = self.__get_buildings()
         self.__construction_sections = self.__get_construction_sections()
-        self.__rebar = self.__get_rebar()
 
-    def update_elements_info(self):
-        pass
+    def __filter_by_param(self, elements, param_name, value, is_inst=True):
+        filtered_list = []
+        for element in elements:
+            if is_inst:
+                param_value = element.GetParamValue(param_name)
+            else:
+                element_type = self.doc.GetElement(element.GetTypeId())
+                param_value = element_type.GetParamValueOrDefault(param_name, 0)
+
+            if param_value != value:
+                filtered_list.append(element)
+        return filtered_list
+
+    def __filter_by_type(self, elements):
+        filtered_list = []
+        for element in elements:
+            # Проверить получение типоразмера по Name
+            if self.type_key_word in element.Name:
+                filtered_list.append(element)
+
+        return filtered_list
 
     def get_filtered_concrete(self, buildings, constr_sections):
         buildings = [x.text_value for x in buildings if x.is_checked]
         constr_sections = [x.text_value for x in constr_sections if x.is_checked]
         filtered_elements = []
         for element in self.concrete:
-            param1 = element.LookupParameter("ФОП_Секция СМР")
-            param2 = element.LookupParameter("обр_ФОП_Раздел проекта")
-
-            if self.get_param_value(param1) in buildings:
-                if self.get_param_value(param2) in constr_sections:
+            if element.GetParamValue("ФОП_Секция СМР") in buildings:
+                if element.GetParamValue("обр_ФОП_Раздел проекта") in constr_sections:
                     filtered_elements.append(element)
 
         return filtered_elements
@@ -65,11 +81,8 @@ class RevitRepository:
         constr_sections = [x.text_value for x in constr_sections if x.is_checked]
         filtered_elements = []
         for element in self.rebar:
-            param1 = element.LookupParameter("ФОП_Секция СМР")
-            param2 = element.LookupParameter("обр_ФОП_Раздел проекта")
-
-            if self.get_param_value(param1) in buildings:
-                if self.get_param_value(param2) in constr_sections:
+            if element.GetParamValue("ФОП_Секция СМР") in buildings:
+                if element.GetParamValue("обр_ФОП_Раздел проекта") in constr_sections:
                     filtered_elements.append(element)
 
         return filtered_elements
@@ -77,8 +90,7 @@ class RevitRepository:
     def __create_param_set(self, elements, param_name):
         set_of_values = set()
         for element in elements:
-            param = element.LookupParameter(param_name)
-            set_of_values.add(self.get_param_value(param))
+            set_of_values.add(element.GetParamValue(param_name))
         return sorted(set_of_values)
 
     def __get_buildings(self):
@@ -95,22 +107,17 @@ class RevitRepository:
             result_sections.append(ElementSection(section))
         return result_sections
 
-    def __filter_by_param(self, elements, param_name, value):
-        filtered_list = []
-        for element in elements:
-            param = element.LookupParameter(param_name)
-            if self.get_param_value(param) != value:
-                filtered_list.append(element)
-        return filtered_list
+    def __get_rebar(self):
+        elements = FilteredElementCollector(self.doc).OfCategory(BuiltInCategory.OST_Rebar)
+        elements.WhereElementIsNotElementType().ToElements()
+        elements = self.__filter_by_param(elements, "обр_ФОП_Фильтрация 1", "Исключить из показателей качества")
+        elements = self.__filter_by_param(elements, "обр_ФОП_Фильтрация 2", "Исключить из показателей качества")
+        elements = self.__filter_by_param(elements, "обр_ФОП_Форма_номер", 1000, False)
+        elements_new = []
+        for value in self.quality_indexes.values():
+            elements_new += self.__filter_by_param(elements, "обр_ФОП_Группа КР", value)
 
-    def __filter_by_type(self, elements):
-        filtered_list = []
-        for element in elements:
-            # Проверить получение типоразмера по Name
-            if self.type_key_word in element.Name:
-                filtered_list.append(element)
-
-        return filtered_list
+        return elements_new
 
     def __get_concrete(self):
         cat_filters = [ElementCategoryFilter(x.Id) for x in self.categories]
@@ -123,25 +130,6 @@ class RevitRepository:
         elements = self.__filter_by_type(elements)
 
         return elements
-
-    def __get_rebar(self):
-        elements = FilteredElementCollector(self.doc).OfCategory(BuiltInCategory.OST_Rebar)
-        elements.WhereElementIsNotElementType().ToElements()
-        elements = self.__filter_by_param(elements, "обр_ФОП_Фильтрация 1", "Исключить из показателей качества")
-        elements = self.__filter_by_param(elements, "обр_ФОП_Фильтрация 2", "Исключить из показателей качества")
-        elements_new = []
-        for value in self.quality_indexes.values():
-            elements_new += self.__filter_by_param(elements, "обр_ФОП_Группа КР", value)
-
-        # elements = self.__filter_by_param(elements, "обр_ФОП_Форма номер", "1000")
-        return elements_new
-
-    @staticmethod
-    def get_param_value(param):
-        if param.HasValue:
-            return param.AsString()
-        else:
-            return ""
 
     @reactive
     def concrete(self):
@@ -203,19 +191,20 @@ class TableType:
 class ElementSection:
     def __init__(self, text_value):
         self.__text_value = text_value
-        if text_value:
-            self.__number = text_value
-        else:
-            self.__number = "<Параметр не заполнен>"
+        self.__number = text_value
         self.__is_checked = False
 
     @reactive
     def number(self):
-        return self.__number
+        if self.__number:
+            return self.__number
+        else:
+            return "<Параметр не заполнен>"
 
     @number.setter
     def number(self, value):
         self.__number = value
+
 
     @reactive
     def text_value(self):
@@ -238,28 +227,69 @@ class Construction:
     """
     Класс для расчетов всех показателей.
     """
-
     def __init__(self, concrete_elements, rebar_elements):
-        self.__concrete = concrete_elements
-        self.__rebar = rebar_elements
+        self.concrete = concrete_elements
+        self.rebar = rebar_elements
 
         self.rebar_by_function = dict()
         self.rebar_mass_by_function = dict()
+        self.concrete_volume = 0
 
         self.group_rebar_by_function()
         self.calculate_quality_indexes()
         self.calculate_concrete_volume()
 
+        self.__diameter_dict = {
+            4: 0.098,
+            5: 0.144,
+            6: 0.222,
+            7: 0.302,
+            8: 0.395,
+            9: 0.499,
+            10: 0.617,
+            12: 0.888,
+            14: 1.208,
+            16: 1.578,
+            18: 1.998,
+            20: 2.466,
+            22: 2.984,
+            25: 3.853,
+            28: 4.834,
+            32: 6.313,
+            36: 7.990,
+            40: 9.805
+        }
+
     def calculate_concrete_volume(self):
-        volume = 0
-        for element in self.__concrete:
-            volume += element.LookupParameter("Объем").AsDouble()
+        for element in self.concrete:
+            self.concrete_volume += element.GetParamValue("Объем")
 
     def calculate_rebar_mass(self, elements):
-        return 100
+        rebar_mass = 0
+        for element in elements:
+            element_type = doc.GetElement(element.GetTypeId())
+            is_ifc_element = element_type.GetParamValue("мод_ФОП_IFC семейство")
+            try:
+                diameter = element.GetParamValue("мод_ФОП_Диаметр")
+                length = element.GetParamValue("обр_ФОП_Длина")
+                # mass_per_metr = self.__diameter_dict[diameter]
+                mass_per_metr = 1
+                if is_ifc_element:
+                    amount = element.GetParamValue("обр_ФОП_Количество")
+                else:
+                    amount = element.GetParamValue("Количество")
+                amount_on_level = element.GetParamValue("обр_ФОП_Количество типовых на этаже")
+                levels_amount = element.GetParamValue("обр_ФОП_Количество типовых этажей")
+
+                element_mass = mass_per_metr * length * amount * amount_on_level * levels_amount
+                rebar_mass += element_mass
+            except:
+                pass
+
+        return rebar_mass
 
     def group_rebar_by_function(self):
-        for element in self.__rebar:
+        for element in self.rebar:
             rebar_function = element.LookupParameter("обр_ФОП_Группа КР").AsString()
             self.rebar_by_function.setdefault(rebar_function, [])
             self.rebar_by_function[rebar_function].append(element)
@@ -283,6 +313,9 @@ class QualityTable:
         self.construction = construction
 
     def create_table(self):
+        # alert(str(len(self.construction.concrete)))
+        # alert(str(len(self.construction.rebar)))
+
         output = script.get_output()
         data = self.set_row_values()
         output.print_table(table_data=data,
@@ -291,15 +324,48 @@ class QualityTable:
 
     def set_row_values(self):
         rows = []
+        # 1 Этажность здания, тип секции
+        first_row = []
+        first_row.append("1 Этажность здания, тип секции")
+        first_row.append("0")
+        rows.append(first_row)
+
+        # 2 Толщина стен, мм / Сечение пилонов, толщина х ширина, мм
+        second_row = []
+        second_row.append("2 Толщина")
+        second_row.append("0")
+        rows.append(second_row)
+
+        # 3 Класс бетона
+        third_row = []
+        third_row.append("3 Класс бетона")
+        third_row.append("B0")
+        rows.append(third_row)
+
+        # 4 Объем бетона, м3
+        fourth_row = []
+        fourth_row.append("4 Объем бетона, м3")
+        fourth_row.append(str(self.construction.concrete_volume))
+        rows.append(fourth_row)
+
+        # 5 Показатели качества
         for index_name in self.indexes.keys():
-            # alert(index_name)
             row = []
             row.append(index_name)
             index = self.indexes[index_name]
             value = self.construction.get_quality_index(index)
-            # alert(str(value))
-            row.append(str(value))
+            if "Масса" in index_name:
+                row.append(str(value))
+            else:
+                concrete_volume = self.construction.concrete_volume
+                row.append(str(value/concrete_volume))
             rows.append(row)
+
+        # Общий расход, кг / м3
+        last_row = []
+        last_row.append("10 Общий расход, кг / м3")
+        last_row.append(str(self.construction.concrete_volume))
+        rows.append(last_row)
         return rows
 
 
@@ -324,11 +390,16 @@ class CreateQualityTableCommand(ICommand):
         self.OnCanExecuteChanged()
 
     def CanExecute(self, parameter):
+        # if not self.__view_model.self.filtered_concrete:
+        #     self.__view_model.error_text = "Заполните все поля."
+        #     return False
+        #
+        # self.__view_model.error_text = None
         return True
 
     def Execute(self, parameter):
-        self.__view_model.quality_table.create_table()
-        # alert(str(len(self.__view_model.quality_table)))
+        if self.__view_model.quality_table:
+            self.__view_model.quality_table.create_table()
 
 
 class MainWindow(WPFWindow):
@@ -352,6 +423,8 @@ class MainWindowViewModel(Reactive):
         self.__quality_table = []
 
         self.__create_tables_command = CreateQualityTableCommand(self)
+
+        self.__error_text = ""
 
     @reactive
     def table_types(self):
@@ -392,10 +465,6 @@ class MainWindowViewModel(Reactive):
 
         return QualityTable(self.selected_table_type, construction)
 
-    # @quality_table.setter
-    # def quality_table(self, value):
-    #     self.__quality_table = value
-
     @property
     def create_tables_command(self):
         return self.__create_tables_command
@@ -409,19 +478,31 @@ def script_execute(plugin_logger):
     walls_cat = Category.GetCategory(doc, BuiltInCategory.OST_Walls)
     columns_cat = Category.GetCategory(doc, BuiltInCategory.OST_StructuralColumns)
 
+    empty_table_type = TableType("<Тип таблицы>")
+    empty_table_type.categories = []
+    empty_table_type.type_key_word = ""
+    empty_table_type.quality_indexes = dict()
+
     walls_table_type = TableType("Стены")
     walls_table_type.categories = [walls_cat]
     walls_table_type.type_key_word = "Стена"
     walls_table_type.quality_indexes = {"Масса вертикальной арматуры, кг": "Продольная арматура",
-                                  "Масса горизонтальной арматуры, кг": "Горизонтальная арматура",
-                                  "Масса конструктивной арматуры, кг": "Конструктивная арматура"}
+                                        "Расход вертикальной арматуры, кг/м3": "Продольная арматура",
+                                        "Масса горизонтальной арматуры, кг": "Горизонтальная арматура",
+                                        "Расход горизонтальной арматуры, кг/м3": "Горизонтальная арматура",
+                                        "Масса конструктивной арматуры, кг": "Конструктивная арматураа",
+                                        "Расход конструктивной арматуры, кг/м3": "Конструктивная арматура"}
 
     columns_table_type = TableType("Пилоны")
     columns_table_type.categories = [walls_cat, columns_cat]
     columns_table_type.type_key_word = "Пилон"
-    columns_table_type.quality_indexes = {"Масса продольной арматуры, кг": "Пилоны_Продольная",
-                                "Масса поперечной арматуры, кг": "Пилоны_Поперечная"}
+    columns_table_type.quality_indexes = {"6.1_Масса продольной арматуры, кг": "Пилоны_Продольная",
+                                          "6.2_Расход продольной арматуры, кг/м3": "Пилоны_Продольная",
+                                          "7.1_Масса поперечной арматуры, кг": "Пилоны_Поперечная",
+                                          "7.2_Расход поперечной арматуры, кг/м3": "Пилоны_Поперечная"
+                                          }
 
+    table_types.append(empty_table_type)
     table_types.append(walls_table_type)
     table_types.append(columns_table_type)
 
