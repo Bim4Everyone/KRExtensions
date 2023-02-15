@@ -32,21 +32,179 @@ class RevitRepository:
     Класс для получения всего бетона и арматуры из проекта.
     Фильтрует все элементы.
     """
-    def __init__(self, doc, table_type):
+    def __init__(self, doc):
         self.doc = doc
+
+        self.categories = []
+        self.type_key_word = []
+        self.quality_indexes = []
+        self.__rebar = []
+        self.__concrete = []
+        self.__buildings = []
+        self.__construction_sections = []
+
+    def set_table_type(self, table_type):
         self.categories = table_type.categories
         self.type_key_word = table_type.type_key_word
         self.quality_indexes = table_type.quality_indexes
 
-        self.__concrete = self.__get_concrete()
-        self.__rebar = self.__get_rebar()
+        # self.__rebar = self.__get_filtered_rebar_by_rules()
+
+        self.__concrete = self.__get_concrete_table_type()
         self.__buildings = self.__get_buildings()
         self.__construction_sections = self.__get_construction_sections()
 
-    def __filter_by_param(self, elements, param_name, value, is_inst=True):
+    def check_exist_main_parameters(self):
+        errors_dict = dict()
+        common_parameters = ["обр_ФОП_Раздел проекта",
+                             "ФОП_Секция СМР",
+                             "обр_ФОП_Фильтрация 1",
+                             "обр_ФОП_Фильтрация 2"]
+        concrete_inst_parameters = ["Объем"]
+        rebar_inst_type_parameters = ["обр_ФОП_Форма_номер"]
+        concrete_common_parameters = common_parameters + concrete_inst_parameters
+
+        all_rebar = self.__get_all_rebar()
+        all_concrete = self.__get_all_concrete()
+
+        for element in all_rebar:
+            element_type = self.doc.GetElement(element.GetTypeId())
+            for parameter_name in common_parameters:
+                if not element.IsExistsParam(parameter_name):
+                    key = "Арматура___Отсутствует параметр у экземпляра___" + parameter_name
+                    errors_dict.setdefault(key, [])
+                    errors_dict[key].append(str(element.Id))
+
+            for parameter_name in rebar_inst_type_parameters:
+                if not element.IsExistsParam(parameter_name) and not element_type.IsExistsParam(parameter_name):
+                    key = "Арматура___Отсутствует параметр у экземпляра или типоразмера___" + parameter_name
+                    errors_dict.setdefault(key, [])
+                    errors_dict[key].append(str(element.Id))
+
+        for element in all_concrete:
+            for parameter_name in concrete_common_parameters:
+                if not element.IsExistsParam(parameter_name):
+                    key = "Железобетон___Отсутствует параметр у экземпляра___" + parameter_name
+                    errors_dict.setdefault(key, [])
+                    errors_dict[key].append(str(element.Id))
+
+        if errors_dict:
+            missing_parameters = self.__create_error_list(errors_dict)
+            return missing_parameters
+        else:
+            self.__rebar = self.__get_filtered_rebar_by_rules(all_rebar)
+
+    def check_exist_rebar_parameters(self):
+        errors_dict = dict()
+        rebar_inst_parameters = ["обр_ФОП_Длина",
+                                 "обр_ФОП_Группа КР",
+                                 "обр_ФОП_Количество типовых на этаже",
+                                 "обр_ФОП_Количество типовых этажей"]
+
+        rebar_type_parameters = ["мод_ФОП_IFC семейство"]
+
+        rebar_inst_type_parameters = ["мод_ФОП_Диаметр",
+                                      "обр_ФОП_Форма_номер"]
+
+        rebar_ifc_parameters = ["обр_ФОП_Количество",
+                                "Количество"]
+
+        for element in self.__rebar:
+            element_type = self.doc.GetElement(element.GetTypeId())
+            for parameter_name in rebar_inst_parameters:
+                if not element.IsExistsParam(parameter_name):
+                    key = "Арматура___Отсутствует параметр у экземпляра___" + parameter_name
+                    errors_dict.setdefault(key, [])
+                    errors_dict[key].append(str(element.Id))
+
+            for parameter_name in rebar_type_parameters:
+                if not element_type.IsExistsParam(parameter_name):
+                    key = "Арматура___Отсутствует параметр у типоразмера___" + parameter_name
+                    errors_dict.setdefault(key, [])
+                    errors_dict[key].append(str(element.Id))
+
+            for parameter_name in rebar_inst_type_parameters:
+                if not element.IsExistsParam(parameter_name) and not element_type.IsExistsParam(parameter_name):
+                    key = "Арматура___Отсутствует параметр у экземпляра или типоразмера___" + parameter_name
+                    errors_dict.setdefault(key, [])
+                    errors_dict[key].append(str(element.Id))
+
+            if not element.IsExistsParam("обр_ФОП_Количество") and not element.IsExistsParam("Количество"):
+                key = "Арматура___Отсутствует параметр___Количество (для IFC - 'обр_ФОП_Количество')"
+                errors_dict.setdefault(key, [])
+                errors_dict[key].append(str(element.Id))
+
+        if errors_dict:
+            missing_parameters = self.__create_error_list(errors_dict)
+            return missing_parameters
+
+    def __get_all_concrete(self):
+        all_categories = []
+        all_categories.append(Category.GetCategory(doc, BuiltInCategory.OST_Walls))
+        all_categories.append(Category.GetCategory(doc, BuiltInCategory.OST_StructuralColumns))
+        all_categories.append(Category.GetCategory(doc, BuiltInCategory.OST_StructuralFoundation))
+        all_categories.append(Category.GetCategory(doc, BuiltInCategory.OST_Floors))
+        all_categories.append(Category.GetCategory(doc, BuiltInCategory.OST_StructuralFraming))
+        elements = self.__collect_elements_by_categories(all_categories)
+        return elements
+
+    def get_filtered_concrete_by_user(self, buildings, constr_sections):
+        buildings = [x.text_value for x in buildings if x.is_checked]
+        constr_sections = [x.text_value for x in constr_sections if x.is_checked]
+        filtered_elements = []
+        for element in self.concrete:
+            if element.GetParamValue("ФОП_Секция СМР") in buildings:
+                if element.GetParamValue("обр_ФОП_Раздел проекта") in constr_sections:
+                    filtered_elements.append(element)
+
+        return filtered_elements
+
+    def __get_all_rebar(self):
+        elements = FilteredElementCollector(self.doc).OfCategory(BuiltInCategory.OST_Rebar)
+        elements.WhereElementIsNotElementType().ToElements()
+        return elements
+
+    def __get_filtered_rebar_by_rules(self, elements):
+        elements = self.__filter_by_param(elements, "обр_ФОП_Фильтрация 1", "Исключить из показателей качества")
+        elements = self.__filter_by_param(elements, "обр_ФОП_Фильтрация 2", "Исключить из показателей качества")
+        elements = self.__filter_by_param(elements, "обр_ФОП_Форма_номер", 1000)
+        return elements
+
+    def get_filtered_rebar_by_user(self, buildings, constr_sections):
+        elements_new = []
+        for value in self.quality_indexes.values():
+            elements_new += self.__filter_by_param(self.rebar, "обр_ФОП_Группа КР", value)
+        buildings = [x.text_value for x in buildings if x.is_checked]
+        constr_sections = [x.text_value for x in constr_sections if x.is_checked]
+        filtered_elements = []
+        for element in elements_new:
+            if element.GetParamValue("ФОП_Секция СМР") in buildings:
+                if element.GetParamValue("обр_ФОП_Раздел проекта") in constr_sections:
+                    filtered_elements.append(element)
+
+        return filtered_elements
+
+    def __collect_elements_by_categories(self, categories):
+        cat_filters = [ElementCategoryFilter(x.Id) for x in categories]
+        cat_filters_typed = List[ElementFilter](cat_filters)
+        logical_or_filter = LogicalOrFilter(cat_filters_typed)
+        elements = FilteredElementCollector(self.doc).WherePasses(logical_or_filter)
+        elements.WhereElementIsNotElementType().ToElements()
+        return elements
+
+    def __get_concrete_table_type(self):
+        elements = self.__collect_elements_by_categories(self.categories)
+
+        elements = self.__filter_by_param(elements, "обр_ФОП_Фильтрация 1", "Исключить из показателей качества")
+        elements = self.__filter_by_param(elements, "обр_ФОП_Фильтрация 2", "Исключить из показателей качества")
+        elements = self.__filter_by_type(elements)
+
+        return elements
+
+    def __filter_by_param(self, elements, param_name, value):
         filtered_list = []
         for element in elements:
-            if is_inst:
+            if element.IsExistsParam(param_name):
                 param_value = element.GetParamValue(param_name)
             else:
                 element_type = self.doc.GetElement(element.GetTypeId())
@@ -65,33 +223,24 @@ class RevitRepository:
 
         return filtered_list
 
-    def get_filtered_concrete(self, buildings, constr_sections):
-        buildings = [x.text_value for x in buildings if x.is_checked]
-        constr_sections = [x.text_value for x in constr_sections if x.is_checked]
-        filtered_elements = []
-        for element in self.concrete:
-            if element.GetParamValue("ФОП_Секция СМР") in buildings:
-                if element.GetParamValue("обр_ФОП_Раздел проекта") in constr_sections:
-                    filtered_elements.append(element)
-
-        return filtered_elements
-
-    def get_filtered_rebar(self, buildings, constr_sections):
-        buildings = [x.text_value for x in buildings if x.is_checked]
-        constr_sections = [x.text_value for x in constr_sections if x.is_checked]
-        filtered_elements = []
-        for element in self.rebar:
-            if element.GetParamValue("ФОП_Секция СМР") in buildings:
-                if element.GetParamValue("обр_ФОП_Раздел проекта") in constr_sections:
-                    filtered_elements.append(element)
-
-        return filtered_elements
-
     def __create_param_set(self, elements, param_name):
         set_of_values = set()
         for element in elements:
             set_of_values.add(element.GetParamValue(param_name))
         return sorted(set_of_values)
+
+    def __create_error_list(self, errors_dict):
+        missing_parameters = []
+        for error in errors_dict.keys():
+            error_info = []
+            for word in error.split("___"):
+                error_info.append(word)
+            error_info.append(", ".join(errors_dict[error]))
+            missing_parameters.append(error_info)
+        # pyrevit не выводит таблицу из трех строк
+        if len(missing_parameters) == 3:
+            missing_parameters.append(["_", "_", "_", "_"])
+        return missing_parameters
 
     def __get_buildings(self):
         buildings = self.__create_param_set(self.concrete, "ФОП_Секция СМР")
@@ -106,30 +255,6 @@ class RevitRepository:
         for section in sections:
             result_sections.append(ElementSection(section))
         return result_sections
-
-    def __get_rebar(self):
-        elements = FilteredElementCollector(self.doc).OfCategory(BuiltInCategory.OST_Rebar)
-        elements.WhereElementIsNotElementType().ToElements()
-        elements = self.__filter_by_param(elements, "обр_ФОП_Фильтрация 1", "Исключить из показателей качества")
-        elements = self.__filter_by_param(elements, "обр_ФОП_Фильтрация 2", "Исключить из показателей качества")
-        elements = self.__filter_by_param(elements, "обр_ФОП_Форма_номер", 1000, False)
-        elements_new = []
-        for value in self.quality_indexes.values():
-            elements_new += self.__filter_by_param(elements, "обр_ФОП_Группа КР", value)
-
-        return elements_new
-
-    def __get_concrete(self):
-        cat_filters = [ElementCategoryFilter(x.Id) for x in self.categories]
-        cat_filters_typed = List[ElementFilter](cat_filters)
-        logical_or_filter = LogicalOrFilter(cat_filters_typed)
-        elements = FilteredElementCollector(self.doc).WherePasses(logical_or_filter).WhereElementIsNotElementType().ToElements()
-
-        elements = self.__filter_by_param(elements, "обр_ФОП_Фильтрация 1", "Исключить из показателей качества")
-        elements = self.__filter_by_param(elements, "обр_ФОП_Фильтрация 2", "Исключить из показателей качества")
-        elements = self.__filter_by_type(elements)
-
-        return elements
 
     @reactive
     def concrete(self):
@@ -410,14 +535,14 @@ class MainWindow(WPFWindow):
 
 
 class MainWindowViewModel(Reactive):
-    def __init__(self, table_types):
+    def __init__(self, revit_repository, table_types):
         Reactive.__init__(self)
 
         self.__table_types = []
         self.__table_types = table_types
 
         self.__selected_table_type = self.__table_types[0]
-        self.__revit_repository = None
+        self.__revit_repository = revit_repository
         self.__buildings = []
         self.__construction_sections = []
         self.__quality_table = []
@@ -436,7 +561,7 @@ class MainWindowViewModel(Reactive):
 
     @selected_table_type.setter
     def selected_table_type(self, value):
-        self.__revit_repository = RevitRepository(doc, value)
+        self.__revit_repository.set_table_type(value)
         self.buildings = self.__revit_repository.buildings
         self.construction_sections = self.__revit_repository.construction_sections
         self.__selected_table_type = value
@@ -459,8 +584,8 @@ class MainWindowViewModel(Reactive):
 
     @reactive
     def quality_table(self):
-        concrete = self.__revit_repository.get_filtered_concrete(self.buildings, self.construction_sections)
-        rebar = self.__revit_repository.get_filtered_rebar(self.buildings, self.construction_sections)
+        concrete = self.__revit_repository.get_filtered_concrete_by_user(self.buildings, self.construction_sections)
+        rebar = self.__revit_repository.get_filtered_rebar_by_user(self.buildings, self.construction_sections)
         construction = Construction(concrete, rebar)
 
         return QualityTable(self.selected_table_type, construction)
@@ -506,8 +631,25 @@ def script_execute(plugin_logger):
     table_types.append(walls_table_type)
     table_types.append(columns_table_type)
 
+    revit_repository = RevitRepository(doc)
+    check = revit_repository.check_exist_main_parameters()
+    if check:
+        output = script.get_output()
+        output.print_table(table_data=check,
+                           title="Показатели качества",
+                           columns=["Категории", "Тип ошибки", "Название параметра", "Id"])
+        script.exit()
+
+    check = revit_repository.check_exist_rebar_parameters()
+    if check:
+        output = script.get_output()
+        output.print_table(table_data=check,
+                           title="Показатели качества",
+                           columns=["Категории", "Тип ошибки", "Название параметра", "Id"])
+        script.exit()
+
     main_window = MainWindow()
-    main_window.DataContext = MainWindowViewModel(table_types)
+    main_window.DataContext = MainWindowViewModel(revit_repository, table_types)
     main_window.show_dialog()
 
 
