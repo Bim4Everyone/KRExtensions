@@ -25,12 +25,14 @@ from dosymep_libs.bim4everyone import *
 
 doc = __revit__.ActiveUIDocument.Document
 uidoc = __revit__.ActiveUIDocument
+app = doc.Application
 
 
 class RevitRepository:
     """
     Класс для получения всего бетона и арматуры из проекта.
     """
+
     def __init__(self, doc):
         self.doc = doc
 
@@ -391,7 +393,6 @@ class ElementSection:
     def number(self, value):
         self.__number = value
 
-
     @reactive
     def text_value(self):
         return self.__text_value
@@ -413,6 +414,7 @@ class Construction:
     """
     Класс для расчетов всех показателей.
     """
+
     def __init__(self, table_type, concrete_elements, rebar_elements):
         self.table_type = table_type
         self.concrete = concrete_elements
@@ -451,35 +453,39 @@ class Construction:
         self.__set_concrete_class()
         self.__set_concrete_volume()
         self.__set_rebar_indexes()
-        self.__set_full_consumption()
 
     def __calculate_rebar_mass(self, elements):
         rebar_mass = 0
         for element in elements:
             element_type = doc.GetElement(element.GetTypeId())
             is_ifc_element = element_type.GetParamValue("мод_ФОП_IFC семейство")
-            try:
-                diameter = element.GetParamValue("мод_ФОП_Диаметр")
-                length = element.GetParamValue("обр_ФОП_Длина")
-                mass_per_metr = self.__diameter_dict[4]
-                mass_per_metr = 1
-                if is_ifc_element:
-                    amount = element.GetParamValue("обр_ФОП_Количество")
-                else:
-                    amount = element.GetParamValue("Количество")
-                amount_on_level = element.GetParamValue("обр_ФОП_Количество типовых на этаже")
-                levels_amount = element.GetParamValue("обр_ФОП_Количество типовых этажей")
+            if element.IsExistsParam("мод_ФОП_Диаметр"):
+                diameter_param = element.GetParam("мод_ФОП_Диаметр")
+            else:
+                diameter_param = element_type.GetParam("мод_ФОП_Диаметр")
+            diameter = convert_value(app, diameter_param)
+            mass_per_metr = self.__diameter_dict[diameter]
 
-                element_mass = mass_per_metr * length * amount * amount_on_level * levels_amount
-                rebar_mass += element_mass
-            except:
-                pass
+            length_param = element.GetParam("обр_ФОП_Длина")
+            length = convert_value(app, length_param)
+
+            if is_ifc_element:
+                amount = element.GetParamValue("обр_ФОП_Количество")
+            else:
+                amount = element.GetParamValue("Количество")
+            amount_on_level = element.GetParamValue("обр_ФОП_Количество типовых на этаже")
+            levels_amount = element.GetParamValue("обр_ФОП_Количество типовых этажей")
+
+            element_mass = mass_per_metr * length * amount * amount_on_level * levels_amount
+            rebar_mass += element_mass
 
         return rebar_mass
 
     def __calculate_concrete_volume(self):
         for element in self.concrete:
-            self.__concrete_volume += element.GetParamValue("Объем")
+            volume_param = element.GetParam("Объем")
+            volume = convert_value(app, volume_param)
+            self.__concrete_volume += volume
 
     def __group_rebar_by_function(self):
         # фильтр арматуры по типу таблицы
@@ -489,23 +495,75 @@ class Construction:
             self.__rebar_by_function[rebar_function].append(element)
 
     def __set_building_info(self):
-        self.__quality_indexes["Этажность здания, тип секции"] = 0
+        project_info = FilteredElementCollector(doc).OfClass(ProjectInfo).FirstElement()
+        value = project_info.GetParamValue("Наименование проекта")
+        self.__quality_indexes["Этажность здания, тип секции"] = value
 
     def __set_elements_sizes(self):
-        self.__quality_indexes["Сечение пилонов, толщина х ширина, мм"] = 0
-        self.__quality_indexes["Коэффициент суммарной площади сечений пилонов от площади перекрытия, ΣAw/Ap х 100"] = 0
-        self.__quality_indexes["Толщина стен, мм"] = 0
-        self.__quality_indexes["Толщина плиты, мм"] = 0
+        elements_sizes = set()
+        if self.table_type.name == "Пилоны":
+            walls_category = Category.GetCategory(doc, BuiltInCategory.OST_Walls)
+            columns_category = Category.GetCategory(doc, BuiltInCategory.OST_StructuralColumns)
+            floors_category = Category.GetCategory(doc, BuiltInCategory.OST_Floors)
+
+            for element in self.concrete:
+                element_type = doc.GetElement(element.GetTypeId())
+                if element.Category.Id == columns_category.Id:
+                    if element_type.IsExistsParam("ADSK_Размер_Высота") and element_type.IsExistsParam("ADSK_Размер_Ширина"):
+                        height = element_type.GetParam("ADSK_Размер_Высота").AsValueString()
+                        width = element_type.GetParam("ADSK_Размер_Ширина").AsValueString()
+                        size = height + "х" + width
+                        elements_sizes.add(size)
+                if element.Category.Id == walls_category.Id:
+                    if element_type.IsExistsParam("Толщина") and element.IsExistsParam("Длина"):
+                        height = element_type.GetParam("Длина").AsValueString()
+                        width = element_type.GetParam("Толщина").AsValueString()
+                        size = height + "х" + width
+                        elements_sizes.add(size)
+            self.__quality_indexes["Сечение пилонов, толщина х ширина, мм"] = ", ".join(elements_sizes)
+
+            self.__quality_indexes["Коэффициент суммарной площади сечений пилонов от площади перекрытия, ΣAw/Ap х 100"] = 0
+
+        if self.table_type.name == "Стены":
+            for element in self.concrete:
+                element_type = doc.GetElement(element.GetTypeId())
+                if element_type.IsExistsParam("Толщина"):
+                    width = element_type.GetParam("Толщина").AsValueString()
+                    elements_sizes.add(width)
+            self.__quality_indexes["Толщина стен, мм"] = ", ".join(elements_sizes)
+
+        if self.table_type.name == "Фундаментная плита":
+            for element in self.concrete:
+                element_type = doc.GetElement(element.GetTypeId())
+                if element_type.IsExistsParam("Толщина"):
+                    width = element_type.GetParam("Толщина").AsValueString()
+                    elements_sizes.add(width)
+            self.__quality_indexes["Толщина плиты, мм"] = ", ".join(elements_sizes)
+
+        if self.table_type.name == "Плита перекрытия":
+            for element in self.concrete:
+                element_type = doc.GetElement(element.GetTypeId())
+                if element.Category.Id == floors_category.Id:
+                    if element_type.IsExistsParam("Толщина"):
+                        width = element_type.GetParam("Толщина").AsValueString()
+                        elements_sizes.add(width)
+            self.__quality_indexes["Толщина плиты, мм"] = ", ".join(elements_sizes)
 
     def __set_concrete_class(self):
-        self.__quality_indexes["Класс бетона"] = 0
+        concrete_classes = set()
+        for element in self.concrete:
+            element_type = doc.GetElement(element.GetTypeId())
+            if element_type.IsExistsParam("обр_ФОП_Марка бетона B"):
+                value = element_type.GetParam("обр_ФОП_Марка бетона B").AsValueString()
+                concrete_class = "В" + value
+                concrete_classes.add(concrete_class)
+        self.__quality_indexes["Класс бетона"] = ", ".join(concrete_classes)
 
     def __set_concrete_volume(self):
-        for element in self.concrete:
-            self.__concrete_volume += element.GetParamValue("Объем")
         self.__quality_indexes["Объем бетона, м3"] = self.__concrete_volume
 
     def __set_rebar_indexes(self):
+        full_consumption = 0
         for key in self.table_type.quality_indexes.keys():
             rebar_function = self.table_type.quality_indexes[key]
             elements = self.__rebar_by_function[rebar_function]
@@ -513,10 +571,10 @@ class Construction:
             if "Масса" in key:
                 self.__quality_indexes[key] = rebar_mass
             else:
-                self.__quality_indexes[key] = rebar_mass / self.__concrete_volume
-
-    def __set_full_consumption(self):
-        self.__quality_indexes["Общий расход, кг/м3"] = 0
+                consumption = rebar_mass / self.__concrete_volume
+                self.__quality_indexes[key] = consumption
+                full_consumption += consumption
+        self.__quality_indexes["Общий расход, кг/м3"] = full_consumption
 
     @reactive
     def quality_indexes(self):
@@ -527,6 +585,7 @@ class QualityTable:
     """
     Класс для формирования спецификации.
     """
+
     def __init__(self, table_type, construction):
         self.table_name = table_type.name
         self.indexes = table_type.quality_indexes
@@ -687,6 +746,32 @@ class MainWindowViewModel(Reactive):
     def error_text(self, value):
         self.__error_text = value
 
+
+def convert_value(app, parameter):
+    if parameter.StorageType == StorageType.Double:
+        value = parameter.AsDouble()
+    if parameter.StorageType == StorageType.Integer:
+        value = parameter.AsInteger()
+    if parameter.StorageType == StorageType.String:
+        value = parameter.AsString()
+    if parameter.StorageType == StorageType.ElementId:
+        value = parameter.AsValueString()
+
+    if int(app.VersionNumber) > 2021:
+        try:
+            d_type = parameter.GetUnitTypeId()
+            result = UnitUtils.ConvertFromInternalUnits(value, d_type)
+        except:
+            result = value
+    else:
+        try:
+            d_type = parameter.DisplayUnitType
+            result = UnitUtils.ConvertFromInternalUnits(value, d_type)
+        except:
+            result = value
+    return result
+
+
 @notification()
 @log_plugin(EXEC_PARAMS.command_name)
 def script_execute(plugin_logger):
@@ -724,16 +809,15 @@ def script_execute(plugin_logger):
     foundation_table_type.categories = [foundation_cat]
     foundation_table_type.type_key_word = "ФПлита"
     foundation_table_type.quality_indexes = {"Масса продольной арматуры, кг": "Пилоны_Продольная",
-                                          "Расход продольной арматуры, кг/м3": "Пилоны_Продольная",
-                                          "Масса поперечной арматуры, кг": "Пилоны_Поперечная",
-                                          "Расход поперечной арматуры, кг/м3": "Пилоны_Поперечная"
-                                          }
+                                             "Расход продольной арматуры, кг/м3": "Пилоны_Продольная",
+                                             "Масса поперечной арматуры, кг": "Пилоны_Поперечная",
+                                             "Расход поперечной арматуры, кг/м3": "Пилоны_Поперечная"
+                                             }
 
     table_types.append(empty_table_type)
     table_types.append(walls_table_type)
     table_types.append(columns_table_type)
     table_types.append(foundation_table_type)
-
 
     revit_repository = RevitRepository(doc)
     check = revit_repository.check_exist_main_parameters()
