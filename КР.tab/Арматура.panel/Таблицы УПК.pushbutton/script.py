@@ -42,6 +42,7 @@ class RevitRepository:
 
         self.__rebar = self.__get_all_rebar()
         self.__concrete = self.__get_all_concrete()
+        self.__concrete_by_table_type = []
         self.__buildings = []
         self.__construction_sections = []
 
@@ -131,13 +132,11 @@ class RevitRepository:
     def check_parameters_values(self):
         errors_dict = dict()
         concrete_inst_parameters = ["Объем"]
-        # Исправить параметр обр_ФОП_Длина
+        # Исправить параметр обр_ФОП_Длина (мод_ФОП_)
         rebar_inst_parameters = ["обр_ФОП_Группа КР",
                                  "обр_ФОП_Количество типовых на этаже",
                                  "обр_ФОП_Количество типовых этажей"]
         rebar_inst_type_parameters = ["мод_ФОП_Диаметр"]
-        rebar_ifc_parameters = ["обр_ФОП_Количество",
-                                "Количество"]
 
         for element in self.__rebar:
             element_type = self.doc.GetElement(element.GetTypeId())
@@ -214,7 +213,7 @@ class RevitRepository:
         """
         categories_id = [x.Id for x in self.categories]
         filtered_concrete = [x for x in self.__concrete if x.Category.Id in categories_id]
-        self.__concrete = self.__filter_by_type(filtered_concrete)
+        self.__concrete_by_table_type = self.__filter_by_type(filtered_concrete)
 
     def get_filtered_concrete_by_user(self, buildings, constr_sections):
         buildings = [x.text_value for x in buildings if x.is_checked]
@@ -317,7 +316,7 @@ class RevitRepository:
 
     @reactive
     def concrete(self):
-        return self.__concrete
+        return self.__concrete_by_table_type
 
     @reactive
     def rebar(self):
@@ -581,7 +580,6 @@ class QualityTable:
     """
     Класс для формирования спецификации.
     """
-
     def __init__(self, table_type, construction):
         self.table_name = table_type.name
         self.indexes = table_type.quality_indexes
@@ -657,6 +655,9 @@ class CreateQualityTableCommand(ICommand):
         self.OnCanExecuteChanged()
 
     def CanExecute(self, parameter):
+        if not self.__view_model.revit_repository.rebar:
+            self.__view_model.error_text = "Арматура не найдена в проекте"
+            return False
         if not self.__view_model.buildings:
             self.__view_model.error_text = "ЖБ не найден в проекте"
             return False
@@ -665,7 +666,17 @@ class CreateQualityTableCommand(ICommand):
         return True
 
     def Execute(self, parameter):
-        self.__view_model.quality_table.create_table()
+        buildings = self.__view_model.buildings
+        construction_sections = self.__view_model.construction_sections
+        concrete = self.__view_model.revit_repository.get_filtered_concrete_by_user(buildings, construction_sections)
+        if not concrete:
+            alert("Не найден ЖБ для выбранных секций и разделов")
+        else:
+            rebar = self.__view_model.revit_repository.get_filtered_rebar_by_user(buildings, construction_sections)
+            selected_table_type = self.__view_model.selected_table_type
+            construction = Construction(selected_table_type, concrete, rebar)
+            quality_table = QualityTable(selected_table_type, construction)
+            quality_table.create_table()
 
 
 class MainWindow(WPFWindow):
@@ -685,11 +696,14 @@ class MainWindowViewModel(Reactive):
         self.__revit_repository = revit_repository
         self.__buildings = []
         self.__construction_sections = []
-        self.__quality_table = []
 
         self.__create_tables_command = CreateQualityTableCommand(self)
 
         self.__error_text = ""
+
+    @reactive
+    def revit_repository(self):
+        return self.__revit_repository
 
     @reactive
     def table_types(self):
@@ -701,7 +715,7 @@ class MainWindowViewModel(Reactive):
 
     @selected_table_type.setter
     def selected_table_type(self, value):
-        self.__revit_repository.set_table_type(value)
+        self.revit_repository.set_table_type(value)
         self.buildings = self.__revit_repository.buildings
         self.construction_sections = self.__revit_repository.construction_sections
         self.__selected_table_type = value
@@ -723,24 +737,16 @@ class MainWindowViewModel(Reactive):
         self.__construction_sections = value
 
     @reactive
-    def quality_table(self):
-        concrete = self.__revit_repository.get_filtered_concrete_by_user(self.buildings, self.construction_sections)
-        rebar = self.__revit_repository.get_filtered_rebar_by_user(self.buildings, self.construction_sections)
-        construction = Construction(self.__selected_table_type, concrete, rebar)
-        self.__quality_table = QualityTable(self.selected_table_type, construction)
-        return self.__quality_table
-
-    @property
-    def create_tables_command(self):
-        return self.__create_tables_command
-
-    @reactive
     def error_text(self):
         return self.__error_text
 
     @error_text.setter
     def error_text(self, value):
         self.__error_text = value
+
+    @property
+    def create_tables_command(self):
+        return self.__create_tables_command
 
 
 def convert_value(app, parameter):
@@ -777,11 +783,6 @@ def script_execute(plugin_logger):
     columns_cat = Category.GetCategory(doc, BuiltInCategory.OST_StructuralColumns)
     foundation_cat = Category.GetCategory(doc, BuiltInCategory.OST_Doors)
 
-    empty_table_type = TableType("<Тип таблицы>")
-    empty_table_type.categories = []
-    empty_table_type.type_key_word = ""
-    empty_table_type.quality_indexes = dict()
-
     walls_table_type = TableType("Стены")
     walls_table_type.categories = [walls_cat]
     walls_table_type.type_key_word = "Стена"
@@ -810,7 +811,6 @@ def script_execute(plugin_logger):
                                              "Расход поперечной арматуры, кг/м3": "Пилоны_Поперечная"
                                              }
 
-    table_types.append(empty_table_type)
     table_types.append(walls_table_type)
     table_types.append(columns_table_type)
     table_types.append(foundation_table_type)
