@@ -232,13 +232,13 @@ class RevitRepository:
         return elements
 
     def get_filtered_rebar_by_user(self, buildings, constr_sections):
-        elements_new = []
+        rebar_by_table_type = []
         for value in self.quality_indexes.values():
-            elements_new += self.__filter_by_param(self.rebar, "обр_ФОП_Группа КР", value)
+            rebar_by_table_type += self.__filter_by_param(self.rebar, "обр_ФОП_Группа КР", value)
         buildings = [x.text_value for x in buildings if x.is_checked]
         constr_sections = [x.text_value for x in constr_sections if x.is_checked]
         filtered_elements = []
-        for element in elements_new:
+        for element in rebar_by_table_type:
             if element.GetParamValue("ФОП_Секция СМР") in buildings:
                 if element.GetParamValue("обр_ФОП_Раздел проекта") in constr_sections:
                     filtered_elements.append(element)
@@ -406,10 +406,6 @@ class ElementSection:
 
 
 class Construction:
-    """
-    Класс для расчетов всех показателей.
-    """
-
     def __init__(self, table_type, concrete_elements, rebar_elements):
         self.table_type = table_type
         self.concrete = concrete_elements
@@ -417,9 +413,10 @@ class Construction:
 
         self.__quality_indexes = dict()
         self.__rebar_by_function = dict()
-        self.__concrete_volume = 0
 
+        self.__concrete_volume = 0
         self.__calculate_concrete_volume()
+
         self.__group_rebar_by_function()
 
         self.__diameter_dict = {
@@ -483,7 +480,6 @@ class Construction:
             self.__concrete_volume += volume
 
     def __group_rebar_by_function(self):
-        # фильтр арматуры по типу таблицы
         for element in self.rebar:
             rebar_function = element.LookupParameter("обр_ФОП_Группа КР").AsString()
             self.__rebar_by_function.setdefault(rebar_function, [])
@@ -504,7 +500,8 @@ class Construction:
             for element in self.concrete:
                 element_type = doc.GetElement(element.GetTypeId())
                 if element.Category.Id == columns_category.Id:
-                    if element_type.IsExistsParam("ADSK_Размер_Высота") and element_type.IsExistsParam("ADSK_Размер_Ширина"):
+                    if element_type.IsExistsParam("ADSK_Размер_Высота") and element_type.IsExistsParam(
+                            "ADSK_Размер_Ширина"):
                         height = element_type.GetParam("ADSK_Размер_Высота").AsValueString()
                         width = element_type.GetParam("ADSK_Размер_Ширина").AsValueString()
                         size = height + "х" + width
@@ -517,7 +514,8 @@ class Construction:
                         elements_sizes.add(size)
             self.__quality_indexes["Сечение пилонов, толщина х ширина, мм"] = ", ".join(elements_sizes)
 
-            self.__quality_indexes["Коэффициент суммарной площади сечений пилонов от площади перекрытия, ΣAw/Ap х 100"] = 0
+            self.__quality_indexes[
+                "Коэффициент суммарной площади сечений пилонов от площади перекрытия, ΣAw/Ap х 100"] = 0
 
         if self.table_type.name == "Стены":
             for element in self.concrete:
@@ -580,6 +578,7 @@ class QualityTable:
     """
     Класс для формирования спецификации.
     """
+
     def __init__(self, table_type, construction):
         self.table_name = table_type.name
         self.indexes = table_type.quality_indexes
@@ -669,10 +668,12 @@ class CreateQualityTableCommand(ICommand):
         buildings = self.__view_model.buildings
         construction_sections = self.__view_model.construction_sections
         concrete = self.__view_model.revit_repository.get_filtered_concrete_by_user(buildings, construction_sections)
+        rebar = self.__view_model.revit_repository.get_filtered_rebar_by_user(buildings, construction_sections)
         if not concrete:
             alert("Не найден ЖБ для выбранных секций и разделов")
+        elif not rebar:
+            alert("Не найдена арматура для выбранных секций и разделов")
         else:
-            rebar = self.__view_model.revit_repository.get_filtered_rebar_by_user(buildings, construction_sections)
             selected_table_type = self.__view_model.selected_table_type
             construction = Construction(selected_table_type, concrete, rebar)
             quality_table = QualityTable(selected_table_type, construction)
@@ -689,17 +690,15 @@ class MainWindow(WPFWindow):
 class MainWindowViewModel(Reactive):
     def __init__(self, revit_repository, table_types):
         Reactive.__init__(self)
-
         self.__table_types = table_types
-
-        self.__selected_table_type = self.__table_types[0]
         self.__revit_repository = revit_repository
         self.__buildings = []
         self.__construction_sections = []
+        self.__error_text = ""
 
         self.__create_tables_command = CreateQualityTableCommand(self)
 
-        self.__error_text = ""
+        self.selected_table_type = table_types[0]
 
     @reactive
     def revit_repository(self):
@@ -782,6 +781,8 @@ def script_execute(plugin_logger):
     walls_cat = Category.GetCategory(doc, BuiltInCategory.OST_Walls)
     columns_cat = Category.GetCategory(doc, BuiltInCategory.OST_StructuralColumns)
     foundation_cat = Category.GetCategory(doc, BuiltInCategory.OST_Doors)
+    floor_cat = Category.GetCategory(doc, BuiltInCategory.OST_Floors)
+    framing_cat = Category.GetCategory(doc, BuiltInCategory.OST_StructuralFraming)
 
     walls_table_type = TableType("Стены")
     walls_table_type.categories = [walls_cat]
@@ -805,15 +806,45 @@ def script_execute(plugin_logger):
     foundation_table_type = TableType("Фундаментная плита")
     foundation_table_type.categories = [foundation_cat]
     foundation_table_type.type_key_word = "ФПлита"
-    foundation_table_type.quality_indexes = {"Масса продольной арматуры, кг": "Пилоны_Продольная",
-                                             "Расход продольной арматуры, кг/м3": "Пилоны_Продольная",
-                                             "Масса поперечной арматуры, кг": "Пилоны_Поперечная",
-                                             "Расход поперечной арматуры, кг/м3": "Пилоны_Поперечная"
+    foundation_table_type.quality_indexes = {"Масса нижней фоновой арматуры, кг": "ФП_Фон_Н",
+                                             "Расход нижней фоновой арматуры, кг/м3": "ФП_Фон_Н",
+                                             "Масса нижней арматуры усиления, кг": "ФП_Усиление_Н",
+                                             "Расход нижней арматуры усиления, кг/м3": "ФП_Усиление_Н",
+                                             "Масса верхней фоновой арматуры, кг": "ФП_Фон_В",
+                                             "Расход верхней фоновой арматуры, кг/м3": "ФП_Фон_В",
+                                             "Масса верхней арматуры усиления, кг": "ФП_Усиление_В",
+                                             "Расход верхней арматуры усиления, кг/м3": "ФП_Усиление_В",
+                                             "Масса поперечной арматуры в зонах продавливания, кг": "ФП_Каркасы_Продавливание",
+                                             "Расход поперечной арматуры в зонах продавливания, кг/м3": "ФП_Каркасы_Продавливание",
+                                             "Масса конструктивной арматуры, кг": "ФП_Конструктивная",
+                                             "Расход конструктивной арматуры, кг/м3": "ФП_Конструктивная",
+                                             "Масса выпусков, кг": "ФП_Выпуски",
+                                             "Расход выпусков, кг/м3": "ФП_Выпуски"
                                              }
+
+    floor_table_type = TableType("Плита перекрытия")
+    floor_table_type.categories = [floor_cat, framing_cat, walls_cat]
+    floor_table_type.type_key_word = "ФПлита"
+    floor_table_type.quality_indexes = {"Масса нижней фоновой арматуры, кг": "ПП_Фон_Н",
+                                        "Расход нижней фоновой арматуры, кг/м3": "ПП_Фон_Н",
+                                        "Масса нижней арматуры усиления, кг": "ПП_Усиление_Н",
+                                        "Расход нижней арматуры усиления, кг/м3": "ПП_Усиление_Н",
+                                        "Масса верхней фоновой арматуры, кг": "ПП_Фон_В",
+                                        "Расход верхней фоновой арматуры, кг/м3": "ПП_Фон_В",
+                                        "Масса верхней арматуры усиления, кг": "ПП_Усиление_В",
+                                        "Расход верхней арматуры усиления, кг/м3": "ПП_Усиление_В",
+                                        "Масса поперечной арматуры в зонах продавливания, кг": "ПП_Каркасы_Продавливание",
+                                        "Расход поперечной арматуры в зонах продавливания, кг/м3": "ПП_Каркасы_Продавливание",
+                                        "Масса конструктивной арматуры, кг": "ПП_Конструктивная",
+                                        "Расход конструктивной арматуры, кг/м3": "ПП_Конструктивная",
+                                        "Масса арматуры балок, кг": "ПП_Балки",
+                                        "Расход арматуры балок, кг/м3": "ПП_Балки"
+                                        }
 
     table_types.append(walls_table_type)
     table_types.append(columns_table_type)
     table_types.append(foundation_table_type)
+    table_types.append(floor_table_type)
 
     revit_repository = RevitRepository(doc)
     check = revit_repository.check_exist_main_parameters()
