@@ -1,5 +1,6 @@
 # -*- coding: utf-8 -*-
 import clr
+import datetime
 
 from System.Collections.Generic import *
 
@@ -12,6 +13,8 @@ import pyevent
 from pyrevit import EXEC_PARAMS, revit
 from pyrevit.forms import *
 from pyrevit import script
+
+# from pyrevit.revit import Transaction
 
 from Autodesk.Revit.DB import *
 from Autodesk.Revit.UI.Selection import *
@@ -507,11 +510,11 @@ class Construction:
                 diameter_param = element.GetParam("мод_ФОП_Диаметр")
             else:
                 diameter_param = element_type.GetParam("мод_ФОП_Диаметр")
-            diameter = convert_value(app, diameter_param)
+            diameter = convert_value(diameter_param)
             mass_per_metr = self.__diameter_dict[diameter]
 
             length_param = element.GetParam("обр_ФОП_Длина")
-            length = convert_value(app, length_param) * 0.001
+            length = convert_value(length_param) * 0.001
 
             if is_ifc_element:
                 amount = element.GetParamValue("обр_ФОП_Количество")
@@ -534,7 +537,7 @@ class Construction:
     def __calculate_concrete_volume(self):
         for element in self.concrete:
             volume_param = element.GetParam("Объем")
-            volume = convert_value(app, volume_param)
+            volume = convert_value(volume_param)
             self.__concrete_volume += volume
 
     def __group_rebar_by_function(self):
@@ -637,56 +640,141 @@ class QualityTable:
     def __init__(self, table_type, construction):
         self.table_type = table_type
         self.table_name = table_type.name
+        self.schedule_name = "РД_Показатели качества_" + table_type.name
         self.indexes_info = table_type.indexes_info
         self.indexes_values = construction.quality_indexes
 
+        self.table_width = 186
+        self.table_width_column_1 = 10
+        self.table_width_column_2 = 140
+        self.table_width_column_3 = 35
+        self.row_height = 8
+
     def create_table(self):
-        create_schedule = False
-        if create_schedule:
-            schedule = self.find_schedule()
-            if schedule:
-                self.update_schedule_name()
-                self.create_new_schedule()
-                self.set_row_values()
-            else:
-                self.create_new_schedule()
+        schedule = self.find_schedule()
+        if schedule:
+            self.update_schedule_name(schedule)
+            schedule = self.create_new_schedule(self.table_width)
+            self.set_schedule_row_values(schedule)
         else:
-            output = script.get_output()
-            data = self.set_row_values()
-            data.append(["_", "_", "_"])
-            output.print_table(table_data=data,
-                               title="Показатели качества",
-                               columns=["Номер", "Название", "Значение"])
+            schedule = self.create_new_schedule(self.table_width)
+            self.set_schedule_row_values(schedule)
+
+        # output = script.get_output()
+        # data = self.set_window_row_values()
+        # data.append(["_", "_", "_"])
+        # output.print_table(table_data=data,
+        #                    title="Показатели качества",
+        #                    columns=["Номер", "Название", "Значение"])
 
     def find_schedule(self):
-        table_name = "РД_Показатели качества_" + self.table_name
-
         schedules = FilteredElementCollector(doc).OfClass(ViewSchedule)
 
         fvp = ParameterValueProvider(ElementId(BuiltInParameter.VIEW_NAME))
         rule = FilterStringEquals()
         case_sens = False
-        filter_rule = FilterStringRule(fvp, rule, table_name, case_sens)
+        filter_rule = FilterStringRule(fvp, rule, self.schedule_name, case_sens)
         name_filter = ElementParameterFilter(filter_rule)
         schedules.WherePasses(name_filter)
 
         return schedules.FirstElement()
 
-    def update_schedule_name(self):
-        pass
+    def update_schedule_name(self, schedule):
+        old_name = schedule.Name
+        time = datetime.datetime.now().strftime("%Y-%m-%d %H.%M.%S")
+        with revit.Transaction("BIM: Создание таблицы УПК"):
+            schedule.Name = old_name + "_" + time
 
-    def create_new_schedule(self):
-        pass
+    def create_new_schedule(self, width):
+        category_id = ElementId(BuiltInCategory.OST_Walls)
+        with revit.Transaction("BIM: Создание таблицы УПК"):
+            new_schedule = ViewSchedule.CreateSchedule(doc, category_id)
+            new_schedule.Name = self.schedule_name
 
-    def set_row_values(self):
-        output_rows = []
-        for index in self.indexes_info:
-            output_row = []
-            output_row.append(index.number_in_table)
-            output_row.append(index.name)
-            output_row.append(self.indexes_values[index.name])
-            output_rows.append(output_row)
-        return output_rows
+            s_definition = new_schedule.Definition
+            s_definition.ShowHeaders = False
+            table_data = new_schedule.GetTableData()
+            header_data = table_data.GetSectionData(SectionType.Header)
+            header_data.RemoveRow(0)
+
+            field_type = ScheduleFieldType.Instance
+            param_id = ElementId(BuiltInParameter.ALL_MODEL_INSTANCE_COMMENTS)
+            s_field = s_definition.AddField(field_type, param_id)
+            filter_value = "schedule_for_header"
+            filter_rule = ScheduleFilterType.Equal
+            my_filter = ScheduleFilter(s_field.FieldId, filter_rule, filter_value)
+            s_definition.AddFilter(my_filter)
+
+            s_field.SheetColumnWidth = convert_length(width)
+        return new_schedule
+
+    def options_cell_font(self, alignment=["left", "center", "right"]):
+        tcs = TableCellStyle()
+        options = TableCellStyleOverrideOptions()
+        options.HorizontalAlignment = True
+        options.Font = True
+        options.FontSize = True
+        tcs.FontName = "GOST Common"
+        tcs.TextSize = 9.4482237
+        tcs.SetCellStyleOverrideOptions(options)
+        if alignment == "left":
+            tcs.FontHorizontalAlignment = HorizontalAlignmentStyle.Left
+        elif alignment == "central":
+            tcs.FontHorizontalAlignment = HorizontalAlignmentStyle.Center
+        elif alignment == "right":
+            tcs.FontHorizontalAlignment = HorizontalAlignmentStyle.Right
+        return tcs
+
+    def set_schedule_row_values(self, schedule):
+        table_data = schedule.GetTableData()
+        header_data = table_data.GetSectionData(SectionType.Header)
+        with revit.Transaction("BIM: Заполнение таблицы УПК"):
+            header_data.InsertColumn(0)
+            header_data.InsertColumn(1)
+            header_data.SetColumnWidth(0, convert_length(self.table_width_column_1))
+            header_data.SetColumnWidth(1, convert_length(self.table_width_column_2))
+            header_data.SetColumnWidth(2, convert_length(self.table_width_column_3))
+
+            header_data.InsertRow(0)
+            height = 15
+            header_data.SetRowHeight(0, convert_length(height))
+            value1 = "№"
+            header_data.SetCellStyle(0, 0, self.options_cell_font("central"))
+            header_data.SetCellText(0, 0, value1)
+
+            value2 = "Анализируемый параметр"
+            header_data.SetCellStyle(0, 1, self.options_cell_font("central"))
+            header_data.SetCellText(0, 1, value2)
+
+            value3 = "Значения"
+            header_data.SetCellStyle(0, 2, self.options_cell_font("central"))
+            header_data.SetCellText(0, 2, value3)
+
+            for i, quality_index in enumerate(self.indexes_info):
+                header_data.InsertRow(i + 1)
+                header_data.SetRowHeight(i + 1, convert_length(self.row_height))
+
+                index_number = quality_index.number
+                header_data.SetCellStyle(i + 1, 0, self.options_cell_font("central"))
+                header_data.SetCellText(i + 1, 0, index_number)
+
+                index_name = quality_index.name
+                header_data.SetCellStyle(i + 1, 1, self.options_cell_font("left"))
+                header_data.SetCellText(i + 1, 1, index_name)
+
+                index_value = str(self.indexes_values[quality_index.name])
+                header_data.SetCellStyle(i + 1, 2, self.options_cell_font("central"))
+                header_data.SetCellText(i + 1, 2, index_value)
+
+    # def set_window_row_values(self):
+    #     output_rows = []
+    #     for index in self.indexes_info:
+    #         output_row = []
+    #         output_row.append(index.number)
+    #         output_row.append(index.name)
+    #         output_row.append(self.indexes_values[index.name])
+    #         output_rows.append(output_row)
+    #     return output_rows
 
 
 class CreateQualityTableCommand(ICommand):
@@ -804,7 +892,7 @@ class MainWindowViewModel(Reactive):
         return self.__create_tables_command
 
 
-def convert_value(app, parameter):
+def convert_value(parameter):
     if parameter.StorageType == StorageType.Double:
         value = parameter.AsDouble()
     if parameter.StorageType == StorageType.Integer:
@@ -827,6 +915,15 @@ def convert_value(app, parameter):
         except:
             result = value
     return result
+
+
+def convert_length(value):
+    if int(app.VersionNumber) < 2021:
+        unit_type = DisplayUnitType.DUT_MILLIMETERS
+    else:
+        unit_type = UnitTypeId.Millimeters
+    converted_value = UnitUtils.ConvertToInternalUnits(value, unit_type)
+    return converted_value
 
 
 @notification()
@@ -956,6 +1053,5 @@ def script_execute(plugin_logger):
     main_window = MainWindow()
     main_window.DataContext = MainWindowViewModel(revit_repository, table_types)
     main_window.show_dialog()
-
 
 script_execute()
