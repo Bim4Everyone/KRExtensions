@@ -49,7 +49,7 @@ class RevitRepository:
     def set_table_type(self, table_type):
         self.categories = table_type.categories
         self.type_key_word = table_type.type_key_word
-        self.quality_indexes = table_type.quality_indexes
+        self.quality_indexes = table_type.indexes_info
 
         self.__get_concrete_by_table_type()
         self.__buildings = self.__get_buildings()
@@ -233,7 +233,8 @@ class RevitRepository:
 
     def get_filtered_rebar_by_user(self, buildings, constr_sections):
         rebar_by_table_type = []
-        for value in self.quality_indexes.values():
+        rebar_group_values = [x.rebar_group for x in self.quality_indexes if x.index_type == "mass"]
+        for value in rebar_group_values:
             rebar_by_table_type += self.__filter_by_param(self.rebar, "обр_ФОП_Группа КР", value)
         buildings = [x.text_value for x in buildings if x.is_checked]
         constr_sections = [x.text_value for x in constr_sections if x.is_checked]
@@ -336,7 +337,7 @@ class TableType:
         self.__name = name
         self.__type_key_word = ""
         self.__categories = []
-        self.__quality_indexes = dict()
+        self.__indexes_info = []
 
     @reactive
     def name(self):
@@ -363,12 +364,61 @@ class TableType:
         self.__categories = value
 
     @reactive
-    def quality_indexes(self):
-        return self.__quality_indexes
+    def indexes_info(self):
+        return self.__indexes_info
 
-    @quality_indexes.setter
-    def quality_indexes(self, value):
-        self.__quality_indexes = value
+    @indexes_info.setter
+    def indexes_info(self, value):
+        self.__indexes_info = value
+
+
+class QualityIndex:
+    def __init__(self, name, number, index_type="", rebar_group=""):
+        self.__name = name
+        self.__number = number
+        # self.__number_in_table = number_in_table
+        self.__index_type = index_type
+        self.__rebar_group = rebar_group
+
+    @reactive
+    def name(self):
+        return self.__name
+
+    @name.setter
+    def name(self, value):
+        self.__name = value
+
+    @reactive
+    def number(self):
+        return self.__number
+
+    @number.setter
+    def number(self, value):
+        self.__number = value
+
+    @reactive
+    def number_in_table(self):
+        return self.__number_in_table
+
+    @number_in_table.setter
+    def number_in_table(self, value):
+        self.__number_in_table = value
+
+    @reactive
+    def index_type(self):
+        return self.__index_type
+
+    @index_type.setter
+    def index_type(self, value):
+        self.__index_type = value
+
+    @reactive
+    def rebar_group(self):
+        return self.__rebar_group
+
+    @rebar_group.setter
+    def rebar_group(self, value):
+        self.__rebar_group = value
 
 
 class ElementSection:
@@ -413,11 +463,7 @@ class Construction:
 
         self.__quality_indexes = dict()
         self.__rebar_by_function = dict()
-
-        self.__concrete_volume = 0
-        self.__calculate_concrete_volume()
-
-        self.__group_rebar_by_function()
+        self.__rebar_mass_by_function = dict()
 
         self.__diameter_dict = {
             4: 0.098,
@@ -440,13 +486,19 @@ class Construction:
             40: 9.805
         }
 
+        self.__concrete_volume = 0
+        self.__calculate_concrete_volume()
+
+        self.__group_rebar_by_function()
+        self.__calculate_rebar_group_mass()
+
         self.__set_building_info()
         self.__set_elements_sizes()
         self.__set_concrete_class()
         self.__set_concrete_volume()
         self.__set_rebar_indexes()
 
-    def __calculate_rebar_mass(self, elements):
+    def __calculate_rebar_element_mass(self, elements):
         rebar_mass = 0
         for element in elements:
             element_type = doc.GetElement(element.GetTypeId())
@@ -459,7 +511,7 @@ class Construction:
             mass_per_metr = self.__diameter_dict[diameter]
 
             length_param = element.GetParam("обр_ФОП_Длина")
-            length = convert_value(app, length_param)
+            length = convert_value(app, length_param) * 0.001
 
             if is_ifc_element:
                 amount = element.GetParamValue("обр_ФОП_Количество")
@@ -472,6 +524,12 @@ class Construction:
             rebar_mass += element_mass
 
         return rebar_mass
+
+    def __calculate_rebar_group_mass(self):
+        for key in self.__rebar_by_function.keys():
+            elements = self.__rebar_by_function[key]
+            rebar_mass = self.__calculate_rebar_element_mass(elements)
+            self.__rebar_mass_by_function[key] = rebar_mass
 
     def __calculate_concrete_volume(self):
         for element in self.concrete:
@@ -492,11 +550,10 @@ class Construction:
 
     def __set_elements_sizes(self):
         elements_sizes = set()
+        walls_category = Category.GetCategory(doc, BuiltInCategory.OST_Walls)
+        columns_category = Category.GetCategory(doc, BuiltInCategory.OST_StructuralColumns)
+        floors_category = Category.GetCategory(doc, BuiltInCategory.OST_Floors)
         if self.table_type.name == "Пилоны":
-            walls_category = Category.GetCategory(doc, BuiltInCategory.OST_Walls)
-            columns_category = Category.GetCategory(doc, BuiltInCategory.OST_StructuralColumns)
-            floors_category = Category.GetCategory(doc, BuiltInCategory.OST_Floors)
-
             for element in self.concrete:
                 element_type = doc.GetElement(element.GetTypeId())
                 if element.Category.Id == columns_category.Id:
@@ -557,16 +614,18 @@ class Construction:
 
     def __set_rebar_indexes(self):
         full_consumption = 0
-        for key in self.table_type.quality_indexes.keys():
-            rebar_function = self.table_type.quality_indexes[key]
-            elements = self.__rebar_by_function[rebar_function]
-            rebar_mass = self.__calculate_rebar_mass(elements)
-            if "Масса" in key:
-                self.__quality_indexes[key] = rebar_mass
-            else:
-                consumption = rebar_mass / self.__concrete_volume
-                self.__quality_indexes[key] = consumption
-                full_consumption += consumption
+        for index_info in self.table_type.indexes_info:
+            if index_info.index_type == "mass" or index_info.index_type == "consumption":
+                rebar_function = index_info.rebar_group
+                rebar_mass = 0
+                if rebar_function in self.__rebar_mass_by_function.keys():
+                    rebar_mass = self.__rebar_mass_by_function[rebar_function]
+                if index_info.index_type == "mass":
+                    self.__quality_indexes[index_info.name] = rebar_mass
+                elif index_info.index_type == "consumption":
+                    consumption = rebar_mass / self.__concrete_volume
+                    full_consumption += consumption
+                    self.__quality_indexes[index_info.name] = consumption
         self.__quality_indexes["Общий расход, кг/м3"] = full_consumption
 
     @reactive
@@ -575,61 +634,58 @@ class Construction:
 
 
 class QualityTable:
-    """
-    Класс для формирования спецификации.
-    """
-
     def __init__(self, table_type, construction):
+        self.table_type = table_type
         self.table_name = table_type.name
-        self.indexes = table_type.quality_indexes
-        self.quality_indexes = construction.quality_indexes
+        self.indexes_info = table_type.indexes_info
+        self.indexes_values = construction.quality_indexes
 
     def create_table(self):
-        output = script.get_output()
-        data = self.set_row_values()
-        data.append(["_", "_", "_"])
-        output.print_table(table_data=data,
-                           title="Показатели качества",
-                           columns=["Номер", "Название", "Значение"])
+        create_schedule = False
+        if create_schedule:
+            schedule = self.find_schedule()
+            if schedule:
+                self.update_schedule_name()
+                self.create_new_schedule()
+                self.set_row_values()
+            else:
+                self.create_new_schedule()
+        else:
+            output = script.get_output()
+            data = self.set_row_values()
+            data.append(["_", "_", "_"])
+            output.print_table(table_data=data,
+                               title="Показатели качества",
+                               columns=["Номер", "Название", "Значение"])
+
+    def find_schedule(self):
+        table_name = "РД_Показатели качества_" + self.table_name
+
+        schedules = FilteredElementCollector(doc).OfClass(ViewSchedule)
+
+        fvp = ParameterValueProvider(ElementId(BuiltInParameter.VIEW_NAME))
+        rule = FilterStringEquals()
+        case_sens = False
+        filter_rule = FilterStringRule(fvp, rule, table_name, case_sens)
+        name_filter = ElementParameterFilter(filter_rule)
+        schedules.WherePasses(name_filter)
+
+        return schedules.FirstElement()
+
+    def update_schedule_name(self):
+        pass
+
+    def create_new_schedule(self):
+        pass
 
     def set_row_values(self):
-        table = []
-        if self.table_name == "Пилоны":
-            table = [
-                ["1", "Этажность здания, тип секции"],
-                ["2", "Сечение пилонов, толщина х ширина, мм"],
-                ["3", "Класс бетона"],
-                ["4", "Объем бетона, м3"],
-                ["5", "Коэффициент суммарной площади сечений пилонов от площади перекрытия, ΣAw/Ap х 100"],
-                ["6.1", "Масса продольной арматуры, кг"],
-                ["6.2", "Расход продольной арматуры, кг/м3"],
-                ["7.1", "Масса поперечной арматуры, кг"],
-                ["7.2", "Расход поперечной арматуры, кг/м3"],
-                ["8", "Общий расход, кг/м3"],
-            ]
-        if self.table_name == "Стены":
-            table = [
-                ["1", "Этажность здания, тип секции"],
-                ["2", "Толщина стен, мм"],
-                ["3", "Класс бетона"],
-                ["4", "Объем бетона, м3"],
-                ["5.1", "Масса вертикальной арматуры, кг"],
-                ["5.2", "Расход вертикальной арматуры, кг/м3"],
-                ["6.1", "Масса горизонтальной арматуры, кг"],
-                ["6.2", "Расход горизонтальной арматуры, кг/м3"],
-                ["7.1", "Масса конструктивной арматуры, кг"],
-                ["7.2", "Расход конструктивной арматуры, кг/м3"],
-                ["8", "Общий расход, кг/м3"],
-            ]
-
         output_rows = []
-        for row in table:
+        for index in self.indexes_info:
             output_row = []
-            output_row.append(row[0])
-            output_row.append(row[1])
-            output_row.append(self.quality_indexes[row[1]])
+            output_row.append(index.number_in_table)
+            output_row.append(index.name)
+            output_row.append(self.indexes_values[index.name])
             output_rows.append(output_row)
-
         return output_rows
 
 
@@ -787,59 +843,83 @@ def script_execute(plugin_logger):
     walls_table_type = TableType("Стены")
     walls_table_type.categories = [walls_cat]
     walls_table_type.type_key_word = "Стена"
-    walls_table_type.quality_indexes = {"Масса вертикальной арматуры, кг": "Стены_Вертикальная",
-                                        "Расход вертикальной арматуры, кг/м3": "Стены_Вертикальная",
-                                        "Масса горизонтальной арматуры, кг": "Стены_Горизонтальная",
-                                        "Расход горизонтальной арматуры, кг/м3": "Стены_Горизонтальная",
-                                        "Масса конструктивной арматуры, кг": "Стены_Конструктивная",
-                                        "Расход конструктивной арматуры, кг/м3": "Стены_Конструктивная"}
+    walls_table_type.indexes_info = [
+        QualityIndex("Этажность здания, тип секции", "1"),
+        QualityIndex("Толщина стен, мм", "2"),
+        QualityIndex("Класс бетона", "3"),
+        QualityIndex("Объем бетона, м3", "4"),
+        QualityIndex("Масса вертикальной арматуры, кг", "5.1", "mass", "Стены_Вертикальная"),
+        QualityIndex("Расход вертикальной арматуры, кг/м3", "5.2", "consumption", "Стены_Вертикальная"),
+        QualityIndex("Масса горизонтальной арматуры, кг", "6.1", "mass", "Стены_Горизонтальная"),
+        QualityIndex("Расход горизонтальной арматуры, кг/м3", "6.2", "consumption", "Стены_Горизонтальная"),
+        QualityIndex("Масса конструктивной арматуры, кг", "7.1", "mass", "Стены_Конструктивная"),
+        QualityIndex("Расход конструктивной арматуры, кг/м3", "7.2", "consumption", "Стены_Конструктивная"),
+        QualityIndex("Общий расход, кг/м3", "8")]
 
     columns_table_type = TableType("Пилоны")
     columns_table_type.categories = [walls_cat, columns_cat]
     columns_table_type.type_key_word = "Пилон"
-    columns_table_type.quality_indexes = {"Масса продольной арматуры, кг": "Пилоны_Продольная",
-                                          "Расход продольной арматуры, кг/м3": "Пилоны_Продольная",
-                                          "Масса поперечной арматуры, кг": "Пилоны_Поперечная",
-                                          "Расход поперечной арматуры, кг/м3": "Пилоны_Поперечная"
-                                          }
+    columns_table_type.indexes_info = [
+        QualityIndex("Этажность здания, тип секции", "1"),
+        QualityIndex("Сечение пилонов, толщина х ширина, мм", "2"),
+        QualityIndex("Класс бетона", "3"),
+        QualityIndex("Объем бетона, м3", "4"),
+        QualityIndex("Коэффициент суммарной площади сечений пилонов от площади перекрытия, ΣAw/Ap х 100", "5"),
+        QualityIndex("Масса продольной арматуры, кг", "6.1", "mass", "Пилоны_Продольная"),
+        QualityIndex("Расход продольной арматуры, кг/м3", "6.2", "consumption", "Пилоны_Продольная"),
+        QualityIndex("Масса поперечной арматуры, кг", "7.1", "mass", "Пилоны_Поперечная"),
+        QualityIndex("Расход поперечной арматуры, кг/м3", "7.2", "consumption", "Пилоны_Поперечная"),
+        QualityIndex("Общий расход, кг/м3", "8")]
 
     foundation_table_type = TableType("Фундаментная плита")
     foundation_table_type.categories = [foundation_cat]
     foundation_table_type.type_key_word = "ФПлита"
-    foundation_table_type.quality_indexes = {"Масса нижней фоновой арматуры, кг": "ФП_Фон_Н",
-                                             "Расход нижней фоновой арматуры, кг/м3": "ФП_Фон_Н",
-                                             "Масса нижней арматуры усиления, кг": "ФП_Усиление_Н",
-                                             "Расход нижней арматуры усиления, кг/м3": "ФП_Усиление_Н",
-                                             "Масса верхней фоновой арматуры, кг": "ФП_Фон_В",
-                                             "Расход верхней фоновой арматуры, кг/м3": "ФП_Фон_В",
-                                             "Масса верхней арматуры усиления, кг": "ФП_Усиление_В",
-                                             "Расход верхней арматуры усиления, кг/м3": "ФП_Усиление_В",
-                                             "Масса поперечной арматуры в зонах продавливания, кг": "ФП_Каркасы_Продавливание",
-                                             "Расход поперечной арматуры в зонах продавливания, кг/м3": "ФП_Каркасы_Продавливание",
-                                             "Масса конструктивной арматуры, кг": "ФП_Конструктивная",
-                                             "Расход конструктивной арматуры, кг/м3": "ФП_Конструктивная",
-                                             "Масса выпусков, кг": "ФП_Выпуски",
-                                             "Расход выпусков, кг/м3": "ФП_Выпуски"
-                                             }
+    foundation_table_type.indexes_info = [
+        QualityIndex("Этажность здания, тип секции", "1"),
+        QualityIndex("Толщина плиты, мм", "2"),
+        QualityIndex("Класс бетона", "3"),
+        QualityIndex("Объем бетона, м3", "4"),
+        QualityIndex("Масса нижней фоновой арматуры, кг", "5.1", "mass", "ФП_Фон_Н"),
+        QualityIndex("Расход нижней фоновой арматуры, кг/м3", "5.2", "consumption", "ФП_Фон_Н"),
+        QualityIndex("Масса нижней арматуры усиления, кг", "5.3", "mass", "ФП_Усиление_Н"),
+        QualityIndex("Расход нижней арматуры усиления, кг/м3", "5.4", "consumption", "ФП_Усиление_Н"),
+        QualityIndex("Масса верхней фоновой арматуры, кг", "6.1", "mass", "ФП_Фон_В"),
+        QualityIndex("Расход верхней фоновой арматуры, кг/м3", "6.2", "consumption", "ФП_Фон_В"),
+        QualityIndex("Масса верхней арматуры усиления, кг", "6.3", "mass", "ФП_Усиление_В"),
+        QualityIndex("Расход верхней арматуры усиления, кг/м3", "6.4", "consumption", "ФП_Усиление_В"),
+        QualityIndex("Масса поперечной арматуры в зонах продавливания, кг", "7.1", "mass", "ФП_Каркасы_Продавливание"),
+        QualityIndex("Расход поперечной арматуры в зонах продавливания, кг/м3", "7.2", "consumption", "ФП_Каркасы_Продавливание"),
+        QualityIndex("Масса конструктивной арматуры, кг", "7.3", "mass", "ФП_Конструктивная"),
+        QualityIndex("Расход конструктивной арматуры, кг/м3", "7.4", "consumption", "ФП_Конструктивная"),
+        QualityIndex("Масса выпусков, кг", "8.1", "mass", "ФП_Выпуски"),
+        QualityIndex("Расход выпусков, кг/м3", "8.2", "consumption", "ФП_Выпуски"),
+        QualityIndex("Масса закладных, кг", "9.1", "mass", "ФП_Закладная "),
+        QualityIndex("Расход закладных, кг/м3", "9.2", "consumption", "ФП_Закладная "),
+        QualityIndex("Общий расход, кг/м3", "10")]
 
     floor_table_type = TableType("Плита перекрытия")
     floor_table_type.categories = [floor_cat, framing_cat, walls_cat]
     floor_table_type.type_key_word = "ФПлита"
-    floor_table_type.quality_indexes = {"Масса нижней фоновой арматуры, кг": "ПП_Фон_Н",
-                                        "Расход нижней фоновой арматуры, кг/м3": "ПП_Фон_Н",
-                                        "Масса нижней арматуры усиления, кг": "ПП_Усиление_Н",
-                                        "Расход нижней арматуры усиления, кг/м3": "ПП_Усиление_Н",
-                                        "Масса верхней фоновой арматуры, кг": "ПП_Фон_В",
-                                        "Расход верхней фоновой арматуры, кг/м3": "ПП_Фон_В",
-                                        "Масса верхней арматуры усиления, кг": "ПП_Усиление_В",
-                                        "Расход верхней арматуры усиления, кг/м3": "ПП_Усиление_В",
-                                        "Масса поперечной арматуры в зонах продавливания, кг": "ПП_Каркасы_Продавливание",
-                                        "Расход поперечной арматуры в зонах продавливания, кг/м3": "ПП_Каркасы_Продавливание",
-                                        "Масса конструктивной арматуры, кг": "ПП_Конструктивная",
-                                        "Расход конструктивной арматуры, кг/м3": "ПП_Конструктивная",
-                                        "Масса арматуры балок, кг": "ПП_Балки",
-                                        "Расход арматуры балок, кг/м3": "ПП_Балки"
-                                        }
+    floor_table_type.indexes_info = [
+        QualityIndex("Этажность здания, тип секции", "1"),
+        QualityIndex("Толщина плиты, мм", "2"),
+        QualityIndex("Класс бетона", "3"),
+        QualityIndex("Объем бетона, м3", "4"),
+        QualityIndex("Масса нижней фоновой арматуры, кг", "5.1", "mass", "ПП_Фон_Н"),
+        QualityIndex("Расход нижней фоновой арматуры, кг/м3", "5.2", "consumption", "ПП_Фон_Н"),
+        QualityIndex("Масса нижней арматуры усиления, кг", "5.3", "mass", "ПП_Усиление_Н"),
+        QualityIndex("Расход нижней арматуры усиления, кг/м3", "5.4", "consumption", "ПП_Усиление_Н"),
+        QualityIndex("Масса верхней фоновой арматуры, кг", "6.1", "mass", "ПП_Фон_В"),
+        QualityIndex("Расход верхней фоновой арматуры, кг/м3", "6.2", "consumption", "ПП_Фон_В"),
+        QualityIndex("Масса верхней арматуры усиления, кг", "6.3", "mass", "ПП_Усиление_В"),
+        QualityIndex("Расход верхней арматуры усиления, кг/м3", "6.4", "consumption", "ПП_Усиление_В"),
+        QualityIndex("Масса поперечной арматуры в зонах продавливания, кг", "7.1", "mass", "ПП_Каркасы_Продавливание"),
+        QualityIndex("Расход поперечной арматуры в зонах продавливания, кг/м3", "7.2", "consumption", "ПП_Каркасы_Продавливание"),
+        QualityIndex("Масса конструктивной арматуры, кг", "8.1", "mass", "ПП_Конструктивная"),
+        QualityIndex("Расход конструктивной арматуры, кг/м3", "8.2", "consumption", "ПП_Конструктивная"),
+        QualityIndex("Масса арматуры балок, кг", "9.1", "mass", "ПП_Балки"),
+        QualityIndex("Расход арматуры балок, кг/м3", "9.2", "consumption", "ПП_Балки"),
+        QualityIndex("Общий расход, кг/м3", "10")]
 
     table_types.append(walls_table_type)
     table_types.append(columns_table_type)
@@ -847,31 +927,31 @@ def script_execute(plugin_logger):
     table_types.append(floor_table_type)
 
     revit_repository = RevitRepository(doc)
-    check = revit_repository.check_exist_main_parameters()
-    if check:
-        output = script.get_output()
-        output.print_table(table_data=check,
-                           title="Показатели качества",
-                           columns=["Категории", "Тип ошибки", "Название параметра", "Id"])
-        script.exit()
+    # check = revit_repository.check_exist_main_parameters()
+    # if check:
+    #     output = script.get_output()
+    #     output.print_table(table_data=check,
+    #                        title="Показатели качества",
+    #                        columns=["Категории", "Тип ошибки", "Название параметра", "Id"])
+    #     script.exit()
 
     revit_repository.filter_by_main_parameters()
 
-    check = revit_repository.check_exist_rebar_parameters()
-    if check:
-        output = script.get_output()
-        output.print_table(table_data=check,
-                           title="Показатели качества",
-                           columns=["Категории", "Тип ошибки", "Название параметра", "Id"])
-        script.exit()
+    # check = revit_repository.check_exist_rebar_parameters()
+    # if check:
+    #     output = script.get_output()
+    #     output.print_table(table_data=check,
+    #                        title="Показатели качества",
+    #                        columns=["Категории", "Тип ошибки", "Название параметра", "Id"])
+    #     script.exit()
 
-    check = revit_repository.check_parameters_values()
-    if check:
-        output = script.get_output()
-        output.print_table(table_data=check,
-                           title="Показатели качества",
-                           columns=["Категории", "Тип ошибки", "Название параметра", "Id"])
-        script.exit()
+    # check = revit_repository.check_parameters_values()
+    # if check:
+    #     output = script.get_output()
+    #     output.print_table(table_data=check,
+    #                        title="Показатели качества",
+    #                        columns=["Категории", "Тип ошибки", "Название параметра", "Id"])
+    #     script.exit()
 
     main_window = MainWindow()
     main_window.DataContext = MainWindowViewModel(revit_repository, table_types)
