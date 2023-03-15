@@ -219,8 +219,8 @@ class RevitRepository:
         self.__concrete_by_table_type = self.__filter_by_type(filtered_concrete)
 
     def get_filtered_concrete_by_user(self, buildings, constr_sections):
-        buildings = [x.text_value for x in buildings if x.is_checked]
-        constr_sections = [x.text_value for x in constr_sections if x.is_checked]
+        buildings = [x.text_value for x in buildings]
+        constr_sections = [x.text_value for x in constr_sections]
         filtered_elements = []
         for element in self.concrete:
             if element.GetParamValue("ФОП_Секция СМР") in buildings:
@@ -235,12 +235,12 @@ class RevitRepository:
         return elements
 
     def get_filtered_rebar_by_user(self, buildings, constr_sections):
+        buildings = [x.text_value for x in buildings]
+        constr_sections = [x.text_value for x in constr_sections]
         rebar_by_table_type = []
         rebar_group_values = [x.rebar_group for x in self.quality_indexes if x.index_type == "mass"]
         for value in rebar_group_values:
             rebar_by_table_type += self.__filter_by_param(self.rebar, "обр_ФОП_Группа КР", value)
-        buildings = [x.text_value for x in buildings if x.is_checked]
-        constr_sections = [x.text_value for x in constr_sections if x.is_checked]
         filtered_elements = []
         for element in rebar_by_table_type:
             if element.GetParamValue("ФОП_Секция СМР") in buildings:
@@ -279,10 +279,9 @@ class RevitRepository:
         """
         filtered_list = []
         for element in elements:
-            # Проверить получение типоразмера по Name
-            if self.type_key_word in element.Name:
-                filtered_list.append(element)
-
+            for word in self.type_key_word:
+                if word in element.Name:
+                    filtered_list.append(element)
         return filtered_list
 
     def __create_param_set(self, elements, param_name):
@@ -548,7 +547,7 @@ class Construction:
 
     def __set_building_info(self):
         project_info = FilteredElementCollector(doc).OfClass(ProjectInfo).FirstElement()
-        value = project_info.GetParamValue("Наименование проекта")
+        value = project_info.GetParamValue("Наименование здания")
         self.__quality_indexes["Этажность здания, тип секции"] = value
 
     def __set_elements_sizes(self):
@@ -572,35 +571,34 @@ class Construction:
                         width = element_type.GetParam("Толщина").AsValueString()
                         size = height + "х" + width
                         elements_sizes.add(size)
+            elements_sizes = sorted(list(elements_sizes))
             self.__quality_indexes["Сечение пилонов, толщина х ширина, мм"] = ", ".join(elements_sizes)
 
             self.__quality_indexes[
                 "Коэффициент суммарной площади сечений пилонов от площади перекрытия, ΣAw/Ap х 100"] = 0
 
         if self.table_type.name == "Стены":
-            for element in self.concrete:
-                element_type = doc.GetElement(element.GetTypeId())
-                if element_type.IsExistsParam("Толщина"):
-                    width = element_type.GetParam("Толщина").AsValueString()
-                    elements_sizes.add(width)
+            elements_sizes = self.__find_elements_width(self.concrete)
             self.__quality_indexes["Толщина стен, мм"] = ", ".join(elements_sizes)
 
         if self.table_type.name == "Фундаментная плита":
-            for element in self.concrete:
-                element_type = doc.GetElement(element.GetTypeId())
-                if element_type.IsExistsParam("Толщина"):
-                    width = element_type.GetParam("Толщина").AsValueString()
-                    elements_sizes.add(width)
+            elements_sizes = self.__find_elements_width(self.concrete)
             self.__quality_indexes["Толщина плиты, мм"] = ", ".join(elements_sizes)
 
         if self.table_type.name == "Плита перекрытия":
-            for element in self.concrete:
-                element_type = doc.GetElement(element.GetTypeId())
-                if element.Category.Id == floors_category.Id:
-                    if element_type.IsExistsParam("Толщина"):
-                        width = element_type.GetParam("Толщина").AsValueString()
-                        elements_sizes.add(width)
+            floor_elements = [x for x in self.concrete if x.Category.Id == floors_category.Id]
+            elements_sizes = self.__find_elements_width(floor_elements)
             self.__quality_indexes["Толщина плиты, мм"] = ", ".join(elements_sizes)
+
+    def __find_elements_width(self, elements):
+        elements_sizes = set()
+        for element in elements:
+            element_type = doc.GetElement(element.GetTypeId())
+            if element_type.IsExistsParam("Толщина"):
+                width = element_type.GetParam("Толщина").AsValueString()
+                elements_sizes.add(width)
+        elements_sizes = sorted(list(elements_sizes))
+        return elements_sizes
 
     def __set_concrete_class(self):
         concrete_classes = set()
@@ -637,10 +635,14 @@ class Construction:
 
 
 class QualityTable:
-    def __init__(self, table_type, construction):
+    def __init__(self, table_type, construction, buildings, sections):
         self.table_type = table_type
         self.table_name = table_type.name
-        self.schedule_name = "РД_Показатели качества_" + table_type.name
+        buildings = [x.number for x in buildings]
+        sections = [x.number for x in sections]
+        buildings_str = "_".join(buildings).replace("<Параметр не заполнен>", "Без секции")
+        sections_str = "_".join(sections).replace("<Параметр не заполнен>", "Без раздела")
+        self.schedule_name = "РД_Показатели качества_" + table_type.name + "_" + buildings_str + "_" + sections_str
         self.indexes_info = table_type.indexes_info
         self.indexes_values = construction.quality_indexes
 
@@ -659,13 +661,6 @@ class QualityTable:
         else:
             schedule = self.create_new_schedule(self.table_width)
             self.set_schedule_row_values(schedule)
-
-        # output = script.get_output()
-        # data = self.set_window_row_values()
-        # data.append(["_", "_", "_"])
-        # output.print_table(table_data=data,
-        #                    title="Показатели качества",
-        #                    columns=["Номер", "Название", "Значение"])
 
     def find_schedule(self):
         schedules = FilteredElementCollector(doc).OfClass(ViewSchedule)
@@ -762,19 +757,12 @@ class QualityTable:
                 header_data.SetCellStyle(i + 1, 1, self.options_cell_font("left"))
                 header_data.SetCellText(i + 1, 1, index_name)
 
-                index_value = str(self.indexes_values[quality_index.name])
+                index_value = self.indexes_values[quality_index.name]
+                if isinstance(index_value, float):
+                    index_value = round(index_value, 2)
+                index_value = str(index_value)
                 header_data.SetCellStyle(i + 1, 2, self.options_cell_font("central"))
                 header_data.SetCellText(i + 1, 2, index_value)
-
-    # def set_window_row_values(self):
-    #     output_rows = []
-    #     for index in self.indexes_info:
-    #         output_row = []
-    #         output_row.append(index.number)
-    #         output_row.append(index.name)
-    #         output_row.append(self.indexes_values[index.name])
-    #         output_rows.append(output_row)
-    #     return output_rows
 
 
 class CreateQualityTableCommand(ICommand):
@@ -811,8 +799,10 @@ class CreateQualityTableCommand(ICommand):
     def Execute(self, parameter):
         buildings = self.__view_model.buildings
         construction_sections = self.__view_model.construction_sections
-        concrete = self.__view_model.revit_repository.get_filtered_concrete_by_user(buildings, construction_sections)
-        rebar = self.__view_model.revit_repository.get_filtered_rebar_by_user(buildings, construction_sections)
+        selected_blds = [x for x in buildings if x.is_checked]
+        selected_sctns = [x for x in construction_sections if x.is_checked]
+        concrete = self.__view_model.revit_repository.get_filtered_concrete_by_user(selected_blds, selected_sctns)
+        rebar = self.__view_model.revit_repository.get_filtered_rebar_by_user(selected_blds, selected_sctns)
         if not concrete:
             alert("Не найден ЖБ для выбранных секций и разделов")
         elif not rebar:
@@ -820,8 +810,9 @@ class CreateQualityTableCommand(ICommand):
         else:
             selected_table_type = self.__view_model.selected_table_type
             construction = Construction(selected_table_type, concrete, rebar)
-            quality_table = QualityTable(selected_table_type, construction)
+            quality_table = QualityTable(selected_table_type, construction, selected_blds, selected_sctns)
             quality_table.create_table()
+        return True
 
 
 class MainWindow(WPFWindow):
@@ -939,7 +930,7 @@ def script_execute(plugin_logger):
 
     walls_table_type = TableType("Стены")
     walls_table_type.categories = [walls_cat]
-    walls_table_type.type_key_word = "Стена"
+    walls_table_type.type_key_word = ["Стена"]
     walls_table_type.indexes_info = [
         QualityIndex("Этажность здания, тип секции", "1"),
         QualityIndex("Толщина стен, мм", "2"),
@@ -955,7 +946,7 @@ def script_execute(plugin_logger):
 
     columns_table_type = TableType("Пилоны")
     columns_table_type.categories = [walls_cat, columns_cat]
-    columns_table_type.type_key_word = "Пилон"
+    columns_table_type.type_key_word = ["Пилон"]
     columns_table_type.indexes_info = [
         QualityIndex("Этажность здания, тип секции", "1"),
         QualityIndex("Сечение пилонов, толщина х ширина, мм", "2"),
@@ -970,7 +961,7 @@ def script_execute(plugin_logger):
 
     foundation_table_type = TableType("Фундаментная плита")
     foundation_table_type.categories = [foundation_cat]
-    foundation_table_type.type_key_word = "ФПлита"
+    foundation_table_type.type_key_word = ["ФПлита"]
     foundation_table_type.indexes_info = [
         QualityIndex("Этажность здания, тип секции", "1"),
         QualityIndex("Толщина плиты, мм", "2"),
@@ -996,7 +987,7 @@ def script_execute(plugin_logger):
 
     floor_table_type = TableType("Плита перекрытия")
     floor_table_type.categories = [floor_cat, framing_cat, walls_cat]
-    floor_table_type.type_key_word = "ФПлита"
+    floor_table_type.type_key_word = ["Перекрытие", "Балка"]
     floor_table_type.indexes_info = [
         QualityIndex("Этажность здания, тип секции", "1"),
         QualityIndex("Толщина плиты, мм", "2"),
@@ -1024,34 +1015,35 @@ def script_execute(plugin_logger):
     table_types.append(floor_table_type)
 
     revit_repository = RevitRepository(doc)
-    # check = revit_repository.check_exist_main_parameters()
-    # if check:
-    #     output = script.get_output()
-    #     output.print_table(table_data=check,
-    #                        title="Показатели качества",
-    #                        columns=["Категории", "Тип ошибки", "Название параметра", "Id"])
-    #     script.exit()
+    check = revit_repository.check_exist_main_parameters()
+    if check:
+        output = script.get_output()
+        output.print_table(table_data=check,
+                           title="Показатели качества",
+                           columns=["Категории", "Тип ошибки", "Название параметра", "Id"])
+        script.exit()
 
     revit_repository.filter_by_main_parameters()
 
-    # check = revit_repository.check_exist_rebar_parameters()
-    # if check:
-    #     output = script.get_output()
-    #     output.print_table(table_data=check,
-    #                        title="Показатели качества",
-    #                        columns=["Категории", "Тип ошибки", "Название параметра", "Id"])
-    #     script.exit()
+    check = revit_repository.check_exist_rebar_parameters()
+    if check:
+        output = script.get_output()
+        output.print_table(table_data=check,
+                           title="Показатели качества",
+                           columns=["Категории", "Тип ошибки", "Название параметра", "Id"])
+        script.exit()
 
-    # check = revit_repository.check_parameters_values()
-    # if check:
-    #     output = script.get_output()
-    #     output.print_table(table_data=check,
-    #                        title="Показатели качества",
-    #                        columns=["Категории", "Тип ошибки", "Название параметра", "Id"])
-    #     script.exit()
+    check = revit_repository.check_parameters_values()
+    if check:
+        output = script.get_output()
+        output.print_table(table_data=check,
+                           title="Показатели качества",
+                           columns=["Категории", "Тип ошибки", "Название параметра", "Id"])
+        script.exit()
 
     main_window = MainWindow()
     main_window.DataContext = MainWindowViewModel(revit_repository, table_types)
     main_window.show_dialog()
+
 
 script_execute()
