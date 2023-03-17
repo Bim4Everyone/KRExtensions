@@ -95,10 +95,11 @@ class RevitRepository:
 
     def check_exist_rebar_parameters(self):
         errors_dict = dict()
-        rebar_inst_parameters = ["обр_ФОП_Длина",
-                                 "обр_ФОП_Группа КР",
+        rebar_inst_parameters = ["обр_ФОП_Группа КР",
                                  "обр_ФОП_Количество типовых на этаже",
                                  "обр_ФОП_Количество типовых этажей"]
+        rebar_uniform_length_parameter = ["обр_ФОП_Длина"]
+        rebar_vary_length_parameter = ["Полная длина стержня"]
         rebar_type_parameters = ["мод_ФОП_IFC семейство"]
         rebar_inst_type_parameters = ["мод_ФОП_Диаметр",
                                       "обр_ФОП_Форма_номер"]
@@ -110,6 +111,26 @@ class RevitRepository:
                     key = "Арматура___Отсутствует параметр у экземпляра___" + parameter_name
                     errors_dict.setdefault(key, [])
                     errors_dict[key].append(str(element.Id))
+
+            for parameter_name in rebar_uniform_length_parameter:
+                if hasattr(element, "DistributionType"):
+                    if element.DistributionType == DB.Structure.DistributionType.Uniform:
+                        if not element.IsExistsParam(parameter_name):
+                            key = "Арматура___Отсутствует параметр у экземпляра___" + parameter_name
+                            errors_dict.setdefault(key, [])
+                            errors_dict[key].append(str(element.Id))
+                elif not element.IsExistsParam(parameter_name):
+                    key = "Арматура___Отсутствует параметр у экземпляра___" + parameter_name
+                    errors_dict.setdefault(key, [])
+                    errors_dict[key].append(str(element.Id))
+
+            for parameter_name in rebar_vary_length_parameter:
+                if hasattr(element, "DistributionType"):
+                    if element.DistributionType == DB.Structure.DistributionType.VaryingLength:
+                        if not element.IsExistsParam(parameter_name):
+                            key = "Арматура___Отсутствует параметр у экземпляра___" + parameter_name
+                            errors_dict.setdefault(key, [])
+                            errors_dict[key].append(str(element.Id))
 
             for parameter_name in rebar_type_parameters:
                 if not element_type.IsExistsParam(parameter_name):
@@ -135,10 +156,11 @@ class RevitRepository:
     def check_parameters_values(self):
         errors_dict = dict()
         concrete_inst_parameters = ["Объем"]
-        # Исправить параметр обр_ФОП_Длина (мод_ФОП_)
         rebar_inst_parameters = ["обр_ФОП_Группа КР",
                                  "обр_ФОП_Количество типовых на этаже",
                                  "обр_ФОП_Количество типовых этажей"]
+        rebar_uniform_length_parameter = ["обр_ФОП_Длина"]
+        rebar_vary_length_parameter = ["Полная длина стержня"]
         rebar_inst_type_parameters = ["мод_ФОП_Диаметр"]
 
         for element in self.__rebar:
@@ -148,6 +170,26 @@ class RevitRepository:
                     key = "Арматура___Отсутствует значение у параметра___" + parameter_name
                     errors_dict.setdefault(key, [])
                     errors_dict[key].append(str(element.Id))
+
+            for parameter_name in rebar_uniform_length_parameter:
+                if hasattr(element, "DistributionType"):
+                    if element.DistributionType == DB.Structure.DistributionType.Uniform:
+                        if not element.GetParam(parameter_name).HasValue:
+                            key = "Арматура___Отсутствует значение у параметра___" + parameter_name
+                            errors_dict.setdefault(key, [])
+                            errors_dict[key].append(str(element.Id))
+                elif not element.GetParam(parameter_name).HasValue:
+                    key = "Арматура___Отсутствует значение у параметра___" + parameter_name
+                    errors_dict.setdefault(key, [])
+                    errors_dict[key].append(str(element.Id))
+
+            for parameter_name in rebar_vary_length_parameter:
+                if hasattr(element, "DistributionType"):
+                    if element.DistributionType == DB.Structure.DistributionType.VaryingLength:
+                        if not element.GetParam(parameter_name).HasValue:
+                            key = "Арматура___Отсутствует значение у параметра___" + parameter_name
+                            errors_dict.setdefault(key, [])
+                            errors_dict[key].append(str(element.Id))
 
             for parameter_name in rebar_inst_type_parameters:
                 if element.IsExistsParam(parameter_name):
@@ -512,7 +554,13 @@ class Construction:
             diameter = convert_value(diameter_param)
             mass_per_metr = self.__diameter_dict[diameter]
 
-            length_param = element.GetParam("обр_ФОП_Длина")
+            if hasattr(element, "DistributionType"):
+                if element.DistributionType == DB.Structure.DistributionType.Uniform:
+                    length_param = element.GetParam("обр_ФОП_Длина")
+                elif element.DistributionType == DB.Structure.DistributionType.VaryingLength:
+                    length_param = element.GetParam("Полная длина стержня")
+            else:
+                length_param = element.GetParam("обр_ФОП_Длина")
             length = convert_value(length_param) * 0.001
 
             if is_ifc_element:
