@@ -33,9 +33,11 @@ app = doc.Application
 
 class RevitRepository:
     """
-    Класс для получения всего бетона и арматуры из проекта.
+    This class created for collecting, checking and filtering elements from revit document.
+    The class collects all elements of required categories.
+    The class has methods to check availability of parameters and their values.
+    The class has methods to filter elements by rules and table type.
     """
-
     def __init__(self, doc):
         self.doc = doc
 
@@ -56,13 +58,8 @@ class RevitRepository:
         self.quality_indexes = table_type.indexes_info
 
         self.__get_concrete_by_table_type()
-        self.__buildings = self.__get_buildings()
-        self.__construction_sections = self.__get_construction_sections()
-
-    def __add_error(self, error_text, element, parameter_name):
-        key = error_text + parameter_name
-        self.__errors_dict.setdefault(key, [])
-        self.__errors_dict[key].append(str(element.Id))
+        self.__buildings = self.__get_elements_sections("ФОП_Секция СМР")
+        self.__construction_sections = self.__get_elements_sections("обр_ФОП_Раздел проекта")
 
     def check_exist_main_parameters(self):
         self.__errors_dict = dict()
@@ -209,20 +206,20 @@ class RevitRepository:
         """
         Получение из проекта всех экземпляров семейств категорий железобетона
         """
-        all_categories = []
-        all_categories.append(Category.GetCategory(doc, BuiltInCategory.OST_Walls))
-        all_categories.append(Category.GetCategory(doc, BuiltInCategory.OST_StructuralColumns))
-        all_categories.append(Category.GetCategory(doc, BuiltInCategory.OST_StructuralFoundation))
-        all_categories.append(Category.GetCategory(doc, BuiltInCategory.OST_Floors))
-        all_categories.append(Category.GetCategory(doc, BuiltInCategory.OST_StructuralFraming))
+        all_categories = [Category.GetCategory(doc, BuiltInCategory.OST_Walls),
+                          Category.GetCategory(doc, BuiltInCategory.OST_StructuralColumns),
+                          Category.GetCategory(doc, BuiltInCategory.OST_StructuralFoundation),
+                          Category.GetCategory(doc, BuiltInCategory.OST_Floors),
+                          Category.GetCategory(doc, BuiltInCategory.OST_StructuralFraming)]
         elements = self.__collect_elements_by_categories(all_categories)
         return elements
 
+    def __get_all_rebar(self):
+        elements = FilteredElementCollector(self.doc).OfCategory(BuiltInCategory.OST_Rebar)
+        elements.WhereElementIsNotElementType().ToElements()
+        return elements
+
     def __get_concrete_by_table_type(self):
-        """
-        Получение из проекта всех экземпляров семейств
-        категорий железобетона по выбранному типу таблицы
-        """
         categories_id = [x.Id for x in self.categories]
         filtered_concrete = [x for x in self.__concrete if x.Category.Id in categories_id]
         self.__concrete_by_table_type = self.__filter_by_type(filtered_concrete)
@@ -235,13 +232,7 @@ class RevitRepository:
             if element.GetParamValue("ФОП_Секция СМР") in buildings:
                 if element.GetParamValue("обр_ФОП_Раздел проекта") in constr_sections:
                     filtered_elements.append(element)
-
         return filtered_elements
-
-    def __get_all_rebar(self):
-        elements = FilteredElementCollector(self.doc).OfCategory(BuiltInCategory.OST_Rebar)
-        elements.WhereElementIsNotElementType().ToElements()
-        return elements
 
     def get_filtered_rebar_by_user(self, buildings, constr_sections):
         buildings = [x.text_value for x in buildings]
@@ -259,9 +250,6 @@ class RevitRepository:
         return filtered_elements
 
     def __collect_elements_by_categories(self, categories):
-        """
-        Получение экземпляров семейств по списку категорий.
-        """
         cat_filters = [ElementCategoryFilter(x.Id) for x in categories]
         cat_filters_typed = List[ElementFilter](cat_filters)
         logical_or_filter = LogicalOrFilter(cat_filters_typed)
@@ -283,10 +271,6 @@ class RevitRepository:
         return filtered_list
 
     def __filter_by_type(self, elements):
-        """
-        Фильтрация семейств по имени типоразмера.
-        В имени типоразмера должно присутствовать ключевое слово.
-        """
         filtered_list = []
         for element in elements:
             for word in self.type_key_word:
@@ -294,11 +278,10 @@ class RevitRepository:
                     filtered_list.append(element)
         return filtered_list
 
-    def __create_param_set(self, elements, param_name):
-        set_of_values = set()
-        for element in elements:
-            set_of_values.add(element.GetParamValue(param_name))
-        return sorted(set_of_values)
+    def __add_error(self, error_text, element, parameter_name):
+        key = error_text + parameter_name
+        self.__errors_dict.setdefault(key, [])
+        self.__errors_dict[key].append(str(element.Id))
 
     def __create_error_list(self, errors_dict):
         missing_parameters = []
@@ -308,24 +291,15 @@ class RevitRepository:
                 error_info.append(word)
             error_info.append(", ".join(errors_dict[error]))
             missing_parameters.append(error_info)
-        # pyrevit не выводит таблицу из трех строк
+        # pyrevit doesn't show a table with 3 lines
         if len(missing_parameters) == 3:
             missing_parameters.append(["_", "_", "_", "_"])
         return missing_parameters
 
-    def __get_buildings(self):
-        buildings = self.__create_param_set(self.concrete, "ФОП_Секция СМР")
-        result_buildings = []
-        for building in buildings:
-            result_buildings.append(ElementSection(building))
-        return result_buildings
-
-    def __get_construction_sections(self):
-        sections = self.__create_param_set(self.concrete, "обр_ФОП_Раздел проекта")
-        result_sections = []
-        for section in sections:
-            result_sections.append(ElementSection(section))
-        return result_sections
+    def __get_elements_sections(self, parameter_name):
+        sections = {x.GetParamValue(parameter_name) for x in self.concrete}
+        sections = sorted(sections)
+        return [ElementSection(x) for x in sections]
 
     @reactive
     def concrete(self):
@@ -345,6 +319,9 @@ class RevitRepository:
 
 
 class TableType:
+    """
+    This class used to represent a quality table type.
+    """
     def __init__(self, name):
         self.__name = name
         self.__type_key_word = ""
@@ -385,6 +362,9 @@ class TableType:
 
 
 class QualityIndex:
+    """
+    This class used to represent a line in a quality table type.
+    """
     def __init__(self, name, number, index_type="", rebar_group=[]):
         self.__name = name
         self.__number = number
@@ -425,6 +405,10 @@ class QualityIndex:
 
 
 class ElementSection:
+    """
+    This class used to represent an object for grouping construction elements.
+    For example building number or construction section.
+    """
     def __init__(self, text_value):
         self.__text_value = text_value
         self.__number = text_value
@@ -459,6 +443,9 @@ class ElementSection:
 
 
 class Construction:
+    """
+    This class created for all calculation of filtered construction elements.
+    """
     def __init__(self, table_type, concrete_elements, rebar_elements):
         self.table_type = table_type
         self.concrete = concrete_elements
@@ -645,6 +632,10 @@ class Construction:
 
 
 class QualityTable:
+    """
+    This class used to represent a quality table.
+    This class has methods for creating schedule in revit and filling the schedule with data.
+    """
     def __init__(self, table_type, construction, buildings, sections):
         self.table_type = table_type
         self.table_name = table_type.name
@@ -666,22 +657,17 @@ class QualityTable:
         schedule = self.find_schedule()
         if schedule:
             self.update_schedule_name(schedule)
-            schedule = self.create_new_schedule(self.table_width)
-            self.set_schedule_row_values(schedule)
-        else:
-            schedule = self.create_new_schedule(self.table_width)
-            self.set_schedule_row_values(schedule)
+        new_schedule = self.create_new_schedule(self.table_width)
+        self.set_schedule_row_values(new_schedule)
 
     def find_schedule(self):
         schedules = FilteredElementCollector(doc).OfClass(ViewSchedule)
-
         fvp = ParameterValueProvider(ElementId(BuiltInParameter.VIEW_NAME))
         rule = FilterStringEquals()
         case_sens = False
         filter_rule = FilterStringRule(fvp, rule, self.schedule_name, case_sens)
         name_filter = ElementParameterFilter(filter_rule)
         schedules.WherePasses(name_filter)
-
         return schedules.FirstElement()
 
     def update_schedule_name(self, schedule):
@@ -822,7 +808,6 @@ class CreateQualityTableCommand(ICommand):
             construction = Construction(selected_table_type, concrete, rebar)
             quality_table = QualityTable(selected_table_type, construction, selected_blds, selected_sctns)
             quality_table.create_table()
-        return True
 
 
 class MainWindow(WPFWindow):
@@ -1054,11 +1039,6 @@ def script_execute(plugin_logger):
     main_window = MainWindow()
     main_window.DataContext = MainWindowViewModel(revit_repository, table_types)
     main_window.show_dialog()
-    script_start = main_window.DialogResult
-
-    if script_start:
-        alert("dd")
-        main_window.Close()
 
 
 script_execute()
