@@ -248,6 +248,7 @@ class RevitRepository:
         constr_sections = [x.text_value for x in constr_sections]
         rebar_by_table_type = []
         rebar_group_values = [x.rebar_group for x in self.quality_indexes if x.index_type == "mass"]
+        rebar_group_values = [name for group in rebar_group_values for name in group]
         for value in rebar_group_values:
             rebar_by_table_type += self.__filter_by_param(self.rebar, "обр_ФОП_Группа КР", value)
         filtered_elements = []
@@ -384,10 +385,9 @@ class TableType:
 
 
 class QualityIndex:
-    def __init__(self, name, number, index_type="", rebar_group=""):
+    def __init__(self, name, number, index_type="", rebar_group=[]):
         self.__name = name
         self.__number = number
-        # self.__number_in_table = number_in_table
         self.__index_type = index_type
         self.__rebar_group = rebar_group
 
@@ -406,14 +406,6 @@ class QualityIndex:
     @number.setter
     def number(self, value):
         self.__number = value
-
-    @reactive
-    def number_in_table(self):
-        return self.__number_in_table
-
-    @number_in_table.setter
-    def number_in_table(self, value):
-        self.__number_in_table = value
 
     @reactive
     def index_type(self):
@@ -632,16 +624,19 @@ class Construction:
         full_consumption = 0
         for index_info in self.table_type.indexes_info:
             if index_info.index_type == "mass" or index_info.index_type == "consumption":
-                rebar_function = index_info.rebar_group
                 rebar_mass = 0
-                if rebar_function in self.__rebar_mass_by_function.keys():
-                    rebar_mass = self.__rebar_mass_by_function[rebar_function]
+                rebar_function = index_info.rebar_group
+                for function in rebar_function:
+                    if function in self.__rebar_mass_by_function.keys():
+                        rebar_mass += self.__rebar_mass_by_function[function]
+
                 if index_info.index_type == "mass":
                     self.__quality_indexes[index_info.name] = rebar_mass
                 elif index_info.index_type == "consumption":
                     consumption = rebar_mass / self.__concrete_volume
                     full_consumption += consumption
                     self.__quality_indexes[index_info.name] = consumption
+
         self.__quality_indexes["Общий расход, кг/м3"] = full_consumption
 
     @reactive
@@ -951,12 +946,12 @@ def script_execute(plugin_logger):
         QualityIndex("Толщина стен, мм", "2"),
         QualityIndex("Класс бетона", "3"),
         QualityIndex("Объем бетона, м3", "4"),
-        QualityIndex("Масса вертикальной арматуры, кг", "5.1", "mass", "Стены_Вертикальная"),
-        QualityIndex("Расход вертикальной арматуры, кг/м3", "5.2", "consumption", "Стены_Вертикальная"),
-        QualityIndex("Масса горизонтальной арматуры, кг", "6.1", "mass", "Стены_Горизонтальная"),
-        QualityIndex("Расход горизонтальной арматуры, кг/м3", "6.2", "consumption", "Стены_Горизонтальная"),
-        QualityIndex("Масса конструктивной арматуры, кг", "7.1", "mass", "Стены_Конструктивная"),
-        QualityIndex("Расход конструктивной арматуры, кг/м3", "7.2", "consumption", "Стены_Конструктивная"),
+        QualityIndex("Масса вертикальной арматуры, кг", "5.1", "mass", ["Стены_Вертикальная"]),
+        QualityIndex("Расход вертикальной арматуры, кг/м3", "5.2", "consumption", ["Стены_Вертикальная"]),
+        QualityIndex("Масса горизонтальной арматуры, кг", "6.1", "mass", ["Стены_Горизонтальная"]),
+        QualityIndex("Расход горизонтальной арматуры, кг/м3", "6.2", "consumption", ["Стены_Горизонтальная"]),
+        QualityIndex("Масса конструктивной арматуры, кг", "7.1", "mass", ["Стены_Конструктивная"]),
+        QualityIndex("Расход конструктивной арматуры, кг/м3", "7.2", "consumption", ["Стены_Конструктивная"]),
         QualityIndex("Общий расход, кг/м3", "8")]
 
     columns_table_type = TableType("Пилоны")
@@ -968,10 +963,10 @@ def script_execute(plugin_logger):
         QualityIndex("Класс бетона", "3"),
         QualityIndex("Объем бетона, м3", "4"),
         QualityIndex("Коэффициент суммарной площади сечений пилонов от площади перекрытия, ΣAw/Ap х 100", "5"),
-        QualityIndex("Масса продольной арматуры, кг", "6.1", "mass", "Пилоны_Продольная"),
-        QualityIndex("Расход продольной арматуры, кг/м3", "6.2", "consumption", "Пилоны_Продольная"),
-        QualityIndex("Масса поперечной арматуры, кг", "7.1", "mass", "Пилоны_Поперечная"),
-        QualityIndex("Расход поперечной арматуры, кг/м3", "7.2", "consumption", "Пилоны_Поперечная"),
+        QualityIndex("Масса продольной арматуры, кг", "6.1", "mass", ["Пилоны_Продольная"]),
+        QualityIndex("Расход продольной арматуры, кг/м3", "6.2", "consumption", ["Пилоны_Продольная"]),
+        QualityIndex("Масса поперечной арматуры, кг", "7.1", "mass", ["Пилоны_Поперечная"]),
+        QualityIndex("Расход поперечной арматуры, кг/м3", "7.2", "consumption", ["Пилоны_Поперечная"]),
         QualityIndex("Общий расход, кг/м3", "8")]
 
     foundation_table_type = TableType("Фундаментная плита")
@@ -982,22 +977,22 @@ def script_execute(plugin_logger):
         QualityIndex("Толщина плиты, мм", "2"),
         QualityIndex("Класс бетона", "3"),
         QualityIndex("Объем бетона, м3", "4"),
-        QualityIndex("Масса нижней фоновой арматуры, кг", "5.1", "mass", "ФП_Фон_Н"),
-        QualityIndex("Расход нижней фоновой арматуры, кг/м3", "5.2", "consumption", "ФП_Фон_Н"),
-        QualityIndex("Масса нижней арматуры усиления, кг", "5.3", "mass", "ФП_Усиление_Н"),
-        QualityIndex("Расход нижней арматуры усиления, кг/м3", "5.4", "consumption", "ФП_Усиление_Н"),
-        QualityIndex("Масса верхней фоновой арматуры, кг", "6.1", "mass", "ФП_Фон_В"),
-        QualityIndex("Расход верхней фоновой арматуры, кг/м3", "6.2", "consumption", "ФП_Фон_В"),
-        QualityIndex("Масса верхней арматуры усиления, кг", "6.3", "mass", "ФП_Усиление_В"),
-        QualityIndex("Расход верхней арматуры усиления, кг/м3", "6.4", "consumption", "ФП_Усиление_В"),
-        QualityIndex("Масса поперечной арматуры в зонах продавливания, кг", "7.1", "mass", "ФП_Каркасы_Продавливание"),
-        QualityIndex("Расход поперечной арматуры в зонах продавливания, кг/м3", "7.2", "consumption", "ФП_Каркасы_Продавливание"),
-        QualityIndex("Масса конструктивной арматуры, кг", "7.3", "mass", "ФП_Конструктивная"),
-        QualityIndex("Расход конструктивной арматуры, кг/м3", "7.4", "consumption", "ФП_Конструктивная"),
-        QualityIndex("Масса выпусков, кг", "8.1", "mass", "ФП_Выпуски"),
-        QualityIndex("Расход выпусков, кг/м3", "8.2", "consumption", "ФП_Выпуски"),
-        QualityIndex("Масса закладных, кг", "9.1", "mass", "ФП_Закладная "),
-        QualityIndex("Расход закладных, кг/м3", "9.2", "consumption", "ФП_Закладная "),
+        QualityIndex("Масса нижней фоновой арматуры, кг", "5.1", "mass", ["ФП_Фон_Н"]),
+        QualityIndex("Расход нижней фоновой арматуры, кг/м3", "5.2", "consumption", ["ФП_Фон_Н"]),
+        QualityIndex("Масса нижней арматуры усиления, кг", "5.3", "mass", ["ФП_Усиление_Н"]),
+        QualityIndex("Расход нижней арматуры усиления, кг/м3", "5.4", "consumption", ["ФП_Усиление_Н"]),
+        QualityIndex("Масса верхней фоновой арматуры, кг", "6.1", "mass", ["ФП_Фон_В"]),
+        QualityIndex("Расход верхней фоновой арматуры, кг/м3", "6.2", "consumption", ["ФП_Фон_В"]),
+        QualityIndex("Масса верхней арматуры усиления, кг", "6.3", "mass", ["ФП_Усиление_В"]),
+        QualityIndex("Расход верхней арматуры усиления, кг/м3", "6.4", "consumption",[ "ФП_Усиление_В"]),
+        QualityIndex("Масса поперечной арматуры в зонах продавливания, кг", "7.1", "mass", ["ФП_Каркасы_Продавливание"]),
+        QualityIndex("Расход поперечной арматуры в зонах продавливания, кг/м3", "7.2", "consumption", ["ФП_Каркасы_Продавливание"]),
+        QualityIndex("Масса конструктивной арматуры, кг", "7.3", "mass", ["ФП_Конструктивная", "ФП_Каркасы_Поддерживающие"]),
+        QualityIndex("Расход конструктивной арматуры, кг/м3", "7.4", "consumption", ["ФП_Конструктивная", "ФП_Каркасы_Поддерживающие"]),
+        QualityIndex("Масса выпусков, кг", "8.1", "mass", ["ФП_Выпуски"]),
+        QualityIndex("Расход выпусков, кг/м3", "8.2", "consumption", ["ФП_Выпуски"]),
+        QualityIndex("Масса закладных, кг", "9.1", "mass", ["ФП_Закладная"]),
+        QualityIndex("Расход закладных, кг/м3", "9.2", "consumption", ["ФП_Закладная"]),
         QualityIndex("Общий расход, кг/м3", "10")]
 
     floor_table_type = TableType("Плита перекрытия")
@@ -1008,20 +1003,20 @@ def script_execute(plugin_logger):
         QualityIndex("Толщина плиты, мм", "2"),
         QualityIndex("Класс бетона", "3"),
         QualityIndex("Объем бетона, м3", "4"),
-        QualityIndex("Масса нижней фоновой арматуры, кг", "5.1", "mass", "ПП_Фон_Н"),
-        QualityIndex("Расход нижней фоновой арматуры, кг/м3", "5.2", "consumption", "ПП_Фон_Н"),
-        QualityIndex("Масса нижней арматуры усиления, кг", "5.3", "mass", "ПП_Усиление_Н"),
-        QualityIndex("Расход нижней арматуры усиления, кг/м3", "5.4", "consumption", "ПП_Усиление_Н"),
-        QualityIndex("Масса верхней фоновой арматуры, кг", "6.1", "mass", "ПП_Фон_В"),
-        QualityIndex("Расход верхней фоновой арматуры, кг/м3", "6.2", "consumption", "ПП_Фон_В"),
-        QualityIndex("Масса верхней арматуры усиления, кг", "6.3", "mass", "ПП_Усиление_В"),
-        QualityIndex("Расход верхней арматуры усиления, кг/м3", "6.4", "consumption", "ПП_Усиление_В"),
-        QualityIndex("Масса поперечной арматуры в зонах продавливания, кг", "7.1", "mass", "ПП_Каркасы_Продавливание"),
-        QualityIndex("Расход поперечной арматуры в зонах продавливания, кг/м3", "7.2", "consumption", "ПП_Каркасы_Продавливание"),
-        QualityIndex("Масса конструктивной арматуры, кг", "8.1", "mass", "ПП_Конструктивная"),
-        QualityIndex("Расход конструктивной арматуры, кг/м3", "8.2", "consumption", "ПП_Конструктивная"),
-        QualityIndex("Масса арматуры балок, кг", "9.1", "mass", "ПП_Балки"),
-        QualityIndex("Расход арматуры балок, кг/м3", "9.2", "consumption", "ПП_Балки"),
+        QualityIndex("Масса нижней фоновой арматуры, кг", "5.1", "mass", ["ПП_Фон_Н"]),
+        QualityIndex("Расход нижней фоновой арматуры, кг/м3", "5.2", "consumption", ["ПП_Фон_Н"]),
+        QualityIndex("Масса нижней арматуры усиления, кг", "5.3", "mass", ["ПП_Усиление_Н"]),
+        QualityIndex("Расход нижней арматуры усиления, кг/м3", "5.4", "consumption", ["ПП_Усиление_Н"]),
+        QualityIndex("Масса верхней фоновой арматуры, кг", "6.1", "mass", ["ПП_Фон_В"]),
+        QualityIndex("Расход верхней фоновой арматуры, кг/м3", "6.2", "consumption", ["ПП_Фон_В"]),
+        QualityIndex("Масса верхней арматуры усиления, кг", "6.3", "mass", ["ПП_Усиление_В"]),
+        QualityIndex("Расход верхней арматуры усиления, кг/м3", "6.4", "consumption", ["ПП_Усиление_В"]),
+        QualityIndex("Масса поперечной арматуры в зонах продавливания, кг", "7.1", "mass", ["ПП_Каркасы_Продавливание"]),
+        QualityIndex("Расход поперечной арматуры в зонах продавливания, кг/м3", "7.2", "consumption", ["ПП_Каркасы_Продавливание"]),
+        QualityIndex("Масса конструктивной арматуры, кг", "8.1", "mass", ["ПП_Конструктивная", "ПП_Каркасы_Поддерживающие"]),
+        QualityIndex("Расход конструктивной арматуры, кг/м3", "8.2", "consumption", ["ПП_Конструктивная", "ПП_Каркасы_Поддерживающие"]),
+        QualityIndex("Масса арматуры балок, кг", "9.1", "mass", ["ПП_Балки"]),
+        QualityIndex("Расход арматуры балок, кг/м3", "9.2", "consumption", ["ПП_Балки"]),
         QualityIndex("Общий расход, кг/м3", "10")]
 
     table_types.append(walls_table_type)
@@ -1059,6 +1054,11 @@ def script_execute(plugin_logger):
     main_window = MainWindow()
     main_window.DataContext = MainWindowViewModel(revit_repository, table_types)
     main_window.show_dialog()
+    script_start = main_window.DialogResult
+
+    if script_start:
+        alert("dd")
+        main_window.Close()
 
 
 script_execute()
