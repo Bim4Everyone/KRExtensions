@@ -48,6 +48,7 @@ class RevitRepository:
         self.__concrete_by_table_type = []
         self.__buildings = []
         self.__construction_sections = []
+        self.__errors_dict = dict()
 
     def set_table_type(self, table_type):
         self.categories = table_type.categories
@@ -58,8 +59,13 @@ class RevitRepository:
         self.__buildings = self.__get_buildings()
         self.__construction_sections = self.__get_construction_sections()
 
+    def __add_error(self, error_text, element, parameter_name):
+        key = error_text + parameter_name
+        self.__errors_dict.setdefault(key, [])
+        self.__errors_dict[key].append(str(element.Id))
+
     def check_exist_main_parameters(self):
-        errors_dict = dict()
+        self.__errors_dict = dict()
         common_parameters = ["обр_ФОП_Раздел проекта",
                              "ФОП_Секция СМР",
                              "обр_ФОП_Фильтрация 1",
@@ -72,89 +78,68 @@ class RevitRepository:
             element_type = self.doc.GetElement(element.GetTypeId())
             for parameter_name in common_parameters:
                 if not element.IsExistsParam(parameter_name):
-                    key = "Арматура___Отсутствует параметр у экземпляра___" + parameter_name
-                    errors_dict.setdefault(key, [])
-                    errors_dict[key].append(str(element.Id))
+                    self.__add_error("Арматура___Отсутствует параметр у экземпляра___", element, parameter_name)
 
             for parameter_name in rebar_inst_type_parameters:
                 if not element.IsExistsParam(parameter_name) and not element_type.IsExistsParam(parameter_name):
-                    key = "Арматура___Отсутствует параметр у экземпляра или типоразмера___" + parameter_name
-                    errors_dict.setdefault(key, [])
-                    errors_dict[key].append(str(element.Id))
+                    self.__add_error("Арматура___Отсутствует параметр у экземпляра или типоразмера___", element, parameter_name)
 
         for element in self.__concrete:
             for parameter_name in concrete_common_parameters:
                 if not element.IsExistsParam(parameter_name):
-                    key = "Железобетон___Отсутствует параметр у экземпляра___" + parameter_name
-                    errors_dict.setdefault(key, [])
-                    errors_dict[key].append(str(element.Id))
+                    self.__add_error("Железобетон___Отсутствует параметр у экземпляра___", element, parameter_name)
 
-        if errors_dict:
-            missing_parameters = self.__create_error_list(errors_dict)
+        if self.__errors_dict:
+            missing_parameters = self.__create_error_list(self.__errors_dict)
             return missing_parameters
 
     def check_exist_rebar_parameters(self):
-        errors_dict = dict()
+        self.__errors_dict = dict()
         rebar_inst_parameters = ["обр_ФОП_Группа КР",
                                  "обр_ФОП_Количество типовых на этаже",
                                  "обр_ФОП_Количество типовых этажей"]
         rebar_uniform_length_parameter = ["обр_ФОП_Длина"]
         rebar_vary_length_parameter = ["Полная длина стержня"]
         rebar_type_parameters = ["мод_ФОП_IFC семейство"]
-        rebar_inst_type_parameters = ["мод_ФОП_Диаметр",
-                                      "обр_ФОП_Форма_номер"]
+        rebar_inst_type_parameters = ["мод_ФОП_Диаметр"]
 
         for element in self.__rebar:
             element_type = self.doc.GetElement(element.GetTypeId())
             for parameter_name in rebar_inst_parameters:
                 if not element.IsExistsParam(parameter_name):
-                    key = "Арматура___Отсутствует параметр у экземпляра___" + parameter_name
-                    errors_dict.setdefault(key, [])
-                    errors_dict[key].append(str(element.Id))
+                    self.__add_error("Арматура___Отсутствует параметр у экземпляра___", element, parameter_name)
 
             for parameter_name in rebar_uniform_length_parameter:
                 if hasattr(element, "DistributionType"):
                     if element.DistributionType == DB.Structure.DistributionType.Uniform:
                         if not element.IsExistsParam(parameter_name):
-                            key = "Арматура___Отсутствует параметр у экземпляра___" + parameter_name
-                            errors_dict.setdefault(key, [])
-                            errors_dict[key].append(str(element.Id))
+                            self.__add_error("Арматура___Отсутствует параметр у экземпляра___", element, parameter_name)
                 elif not element.IsExistsParam(parameter_name):
-                    key = "Арматура___Отсутствует параметр у экземпляра___" + parameter_name
-                    errors_dict.setdefault(key, [])
-                    errors_dict[key].append(str(element.Id))
+                    self.__add_error("Арматура___Отсутствует параметр у экземпляра___", element, parameter_name)
 
             for parameter_name in rebar_vary_length_parameter:
                 if hasattr(element, "DistributionType"):
                     if element.DistributionType == DB.Structure.DistributionType.VaryingLength:
                         if not element.IsExistsParam(parameter_name):
-                            key = "Арматура___Отсутствует параметр у экземпляра___" + parameter_name
-                            errors_dict.setdefault(key, [])
-                            errors_dict[key].append(str(element.Id))
+                            self.__add_error("Арматура___Отсутствует параметр у экземпляра___", element, parameter_name)
 
             for parameter_name in rebar_type_parameters:
                 if not element_type.IsExistsParam(parameter_name):
-                    key = "Арматура___Отсутствует параметр у типоразмера___" + parameter_name
-                    errors_dict.setdefault(key, [])
-                    errors_dict[key].append(str(element.Id))
+                    self.__add_error("Арматура___Отсутствует параметр у типоразмера___", element, parameter_name)
 
             for parameter_name in rebar_inst_type_parameters:
                 if not element.IsExistsParam(parameter_name) and not element_type.IsExistsParam(parameter_name):
-                    key = "Арматура___Отсутствует параметр у экземпляра или типоразмера___" + parameter_name
-                    errors_dict.setdefault(key, [])
-                    errors_dict[key].append(str(element.Id))
+                    self.__add_error("Арматура___Отсутствует параметр у экземпляра или типоразмера___", element, parameter_name)
 
             if not element.IsExistsParam("обр_ФОП_Количество") and not element.IsExistsParam("Количество"):
-                key = "Арматура___Отсутствует параметр___Количество (для IFC - 'обр_ФОП_Количество')"
-                errors_dict.setdefault(key, [])
-                errors_dict[key].append(str(element.Id))
+                self.__add_error("Арматура___Отсутствует параметр___", element, "Количество (для IFC - 'обр_ФОП_Количество')")
 
-        if errors_dict:
-            missing_parameters = self.__create_error_list(errors_dict)
+        if self.__errors_dict:
+            missing_parameters = self.__create_error_list(self.__errors_dict)
             return missing_parameters
 
     def check_parameters_values(self):
-        errors_dict = dict()
+        self.__errors_dict = dict()
         concrete_inst_parameters = ["Объем"]
         rebar_inst_parameters = ["обр_ФОП_Группа КР",
                                  "обр_ФОП_Количество типовых на этаже",
@@ -167,62 +152,44 @@ class RevitRepository:
             element_type = self.doc.GetElement(element.GetTypeId())
             for parameter_name in rebar_inst_parameters:
                 if not element.GetParam(parameter_name).HasValue:
-                    key = "Арматура___Отсутствует значение у параметра___" + parameter_name
-                    errors_dict.setdefault(key, [])
-                    errors_dict[key].append(str(element.Id))
+                    self.__add_error("Арматура___Отсутствует значение у параметра___", element, parameter_name)
 
             for parameter_name in rebar_uniform_length_parameter:
                 if hasattr(element, "DistributionType"):
                     if element.DistributionType == DB.Structure.DistributionType.Uniform:
                         if not element.GetParam(parameter_name).HasValue:
-                            key = "Арматура___Отсутствует значение у параметра___" + parameter_name
-                            errors_dict.setdefault(key, [])
-                            errors_dict[key].append(str(element.Id))
+                            self.__add_error("Арматура___Отсутствует значение у параметра___", element, parameter_name)
                 elif not element.GetParam(parameter_name).HasValue:
-                    key = "Арматура___Отсутствует значение у параметра___" + parameter_name
-                    errors_dict.setdefault(key, [])
-                    errors_dict[key].append(str(element.Id))
+                    self.__add_error("Арматура___Отсутствует значение у параметра___", element, parameter_name)
 
             for parameter_name in rebar_vary_length_parameter:
                 if hasattr(element, "DistributionType"):
                     if element.DistributionType == DB.Structure.DistributionType.VaryingLength:
                         if not element.GetParam(parameter_name).HasValue:
-                            key = "Арматура___Отсутствует значение у параметра___" + parameter_name
-                            errors_dict.setdefault(key, [])
-                            errors_dict[key].append(str(element.Id))
+                            self.__add_error("Арматура___Отсутствует значение у параметра___", element, parameter_name)
 
             for parameter_name in rebar_inst_type_parameters:
                 if element.IsExistsParam(parameter_name):
                     if not element.GetParam(parameter_name).HasValue:
-                        key = "Арматура___Отсутствует значение у параметра (экземпляра или типа)___" + parameter_name
-                        errors_dict.setdefault(key, [])
-                        errors_dict[key].append(str(element.Id))
+                        self.__add_error("Арматура___Отсутствует значение у параметра (экземпляра или типа)___", element, parameter_name)
                 else:
                     if not element_type.GetParam(parameter_name).HasValue:
-                        key = "Арматура___Отсутствует значение у параметра (экземпляра или типа)___" + parameter_name
-                        errors_dict.setdefault(key, [])
-                        errors_dict[key].append(str(element.Id))
+                        self.__add_error("Арматура___Отсутствует значение у параметра (экземпляра или типа)___", element, parameter_name)
 
             if element_type.GetParamValue("мод_ФОП_IFC семейство"):
                 if not element.GetParam("обр_ФОП_Количество").HasValue:
-                    key = "Арматура___Отсутствует значение у параметра___обр_ФОП_Количество"
-                    errors_dict.setdefault(key, [])
-                    errors_dict[key].append(str(element.Id))
+                    self.__add_error("Арматура___Отсутствует значение у параметра___", element, "обр_ФОП_Количество")
             else:
                 if not element.GetParam("Количество").HasValue:
-                    key = "Арматура___Отсутствует значение у параметра___Количество"
-                    errors_dict.setdefault(key, [])
-                    errors_dict[key].append(str(element.Id))
+                    self.__add_error("Арматура___Отсутствует значение у параметра___", element, "Количество")
 
         for element in self.__concrete:
             for parameter_name in concrete_inst_parameters:
                 if element.GetParamValue(parameter_name) == 0:
-                    key = "Железобетон___Отсутствует значение у параметра___" + parameter_name
-                    errors_dict.setdefault(key, [])
-                    errors_dict[key].append(str(element.Id))
+                    self.__add_error("Железобетон___Отсутствует значение у параметра___", element, parameter_name)
 
-        if errors_dict:
-            empty_parameters = self.__create_error_list(errors_dict)
+        if self.__errors_dict:
+            empty_parameters = self.__create_error_list(self.__errors_dict)
             return empty_parameters
 
     def filter_by_main_parameters(self):
@@ -834,11 +801,11 @@ class CreateQualityTableCommand(ICommand):
         self.OnCanExecuteChanged()
 
     def CanExecute(self, parameter):
-        if not self.__view_model.revit_repository.rebar:
-            self.__view_model.error_text = "Арматура не найдена в проекте"
-            return False
         if not self.__view_model.buildings:
             self.__view_model.error_text = "ЖБ не найден в проекте"
+            return False
+        if not self.__view_model.revit_repository.rebar:
+            self.__view_model.error_text = "Арматура не найдена в проекте"
             return False
 
         self.__view_model.error_text = None
