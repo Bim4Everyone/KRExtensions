@@ -14,8 +14,6 @@ from pyrevit import EXEC_PARAMS, revit
 from pyrevit.forms import *
 from pyrevit import script
 
-# from pyrevit.revit import Transaction
-
 from Autodesk.Revit.DB import *
 from Autodesk.Revit.UI.Selection import *
 
@@ -29,6 +27,31 @@ from dosymep_libs.bim4everyone import *
 doc = __revit__.ActiveUIDocument.Document
 uidoc = __revit__.ActiveUIDocument
 app = doc.Application
+
+
+BUILDING_NUMBER = "ФОП_Секция СМР"
+SECTION_NUMBER = "обр_ФОП_Раздел проекта"
+CONSTR_GROUP = "обр_ФОП_Группа КР"
+FILTRATION_1 = "обр_ФОП_Фильтрация 1"
+FILTRATION_2 = "обр_ФОП_Фильтрация 2"
+FORM_NUMBER = "обр_ФОП_Форма_номер"
+VOLUME = "Объем"
+
+AMOUNT = "Количество"
+AMOUNT_SHARED_PARAM = "обр_ФОП_Количество"
+AMOUNT_ON_LEVEL = "обр_ФОП_Количество типовых на этаже"
+AMOUNT_OF_LEVELS = "обр_ФОП_Количество типовых этажей"
+REBAR_DIAMETER = "мод_ФОП_Диаметр"
+REBAR_LENGTH = "обр_ФОП_Длина"
+ROD_LENGTH = "Полная длина стержня"
+IFC_FAMILY = "мод_ФОП_IFC семейство"
+
+THICKNESS = "Толщина"
+LENGTH = "Длина"
+HEIGHT_ADSK = "ADSK_Размер_Высота"
+WIDTH_ADSK = "ADSK_Размер_Ширина"
+CONCRETE_MARK = "обр_ФОП_Марка бетона B"
+BUILDING_INFO = "Наименование здания"
 
 
 class RevitRepository:
@@ -58,17 +81,17 @@ class RevitRepository:
         self.quality_indexes = table_type.indexes_info
 
         self.__get_concrete_by_table_type()
-        self.__buildings = self.__get_elements_sections("ФОП_Секция СМР")
-        self.__construction_sections = self.__get_elements_sections("обр_ФОП_Раздел проекта")
+        self.__buildings = self.__get_elements_sections(BUILDING_NUMBER)
+        self.__construction_sections = self.__get_elements_sections(SECTION_NUMBER)
 
     def check_exist_main_parameters(self):
         self.__errors_dict = dict()
-        common_parameters = ["обр_ФОП_Раздел проекта",
-                             "ФОП_Секция СМР",
-                             "обр_ФОП_Фильтрация 1",
-                             "обр_ФОП_Фильтрация 2"]
-        concrete_inst_parameters = ["Объем"]
-        rebar_inst_type_parameters = ["обр_ФОП_Форма_номер"]
+        common_parameters = [SECTION_NUMBER,
+                             BUILDING_NUMBER,
+                             FILTRATION_1,
+                             FILTRATION_2]
+        concrete_inst_parameters = [VOLUME]
+        rebar_inst_type_parameters = [FORM_NUMBER]
         concrete_common_parameters = common_parameters + concrete_inst_parameters
 
         for element in self.__rebar:
@@ -92,13 +115,13 @@ class RevitRepository:
 
     def check_exist_rebar_parameters(self):
         self.__errors_dict = dict()
-        rebar_inst_parameters = ["обр_ФОП_Группа КР",
-                                 "обр_ФОП_Количество типовых на этаже",
-                                 "обр_ФОП_Количество типовых этажей"]
-        rebar_uniform_length_parameter = ["обр_ФОП_Длина"]
-        rebar_vary_length_parameter = ["Полная длина стержня"]
-        rebar_type_parameters = ["мод_ФОП_IFC семейство"]
-        rebar_inst_type_parameters = ["мод_ФОП_Диаметр"]
+        rebar_inst_parameters = [CONSTR_GROUP,
+                                 AMOUNT_ON_LEVEL,
+                                 AMOUNT_OF_LEVELS]
+        rebar_uniform_length_parameter = [REBAR_LENGTH]
+        rebar_vary_length_parameter = [ROD_LENGTH]
+        rebar_type_parameters = [IFC_FAMILY]
+        rebar_inst_type_parameters = [REBAR_DIAMETER]
 
         for element in self.__rebar:
             element_type = self.doc.GetElement(element.GetTypeId())
@@ -128,8 +151,8 @@ class RevitRepository:
                 if not element.IsExistsParam(parameter_name) and not element_type.IsExistsParam(parameter_name):
                     self.__add_error("Арматура___Отсутствует параметр у экземпляра или типоразмера___", element, parameter_name)
 
-            if not element.IsExistsParam("обр_ФОП_Количество") and not element.IsExistsParam("Количество"):
-                self.__add_error("Арматура___Отсутствует параметр___", element, "Количество (для IFC - 'обр_ФОП_Количество')")
+            if not element.IsExistsParam(AMOUNT_SHARED_PARAM) and not element.IsExistsParam(AMOUNT):
+                self.__add_error("Арматура___Отсутствует параметр___", element, "{0} (для IFC - '{1}')".format(AMOUNT, AMOUNT_SHARED_PARAM))
 
         if self.__errors_dict:
             missing_parameters = self.__create_error_list(self.__errors_dict)
@@ -137,13 +160,13 @@ class RevitRepository:
 
     def check_parameters_values(self):
         self.__errors_dict = dict()
-        concrete_inst_parameters = ["Объем"]
-        rebar_inst_parameters = ["обр_ФОП_Группа КР",
-                                 "обр_ФОП_Количество типовых на этаже",
-                                 "обр_ФОП_Количество типовых этажей"]
-        rebar_uniform_length_parameter = ["обр_ФОП_Длина"]
-        rebar_vary_length_parameter = ["Полная длина стержня"]
-        rebar_inst_type_parameters = ["мод_ФОП_Диаметр"]
+        concrete_inst_parameters = [VOLUME]
+        rebar_inst_parameters = [CONSTR_GROUP,
+                                 AMOUNT_ON_LEVEL,
+                                 AMOUNT_OF_LEVELS]
+        rebar_uniform_length_parameter = [REBAR_LENGTH]
+        rebar_vary_length_parameter = [ROD_LENGTH]
+        rebar_inst_type_parameters = [REBAR_DIAMETER]
 
         for element in self.__rebar:
             element_type = self.doc.GetElement(element.GetTypeId())
@@ -173,12 +196,12 @@ class RevitRepository:
                     if not element_type.GetParam(parameter_name).HasValue:
                         self.__add_error("Арматура___Отсутствует значение у параметра (экземпляра или типа)___", element, parameter_name)
 
-            if element_type.GetParamValue("мод_ФОП_IFC семейство"):
-                if not element.GetParam("обр_ФОП_Количество").HasValue:
-                    self.__add_error("Арматура___Отсутствует значение у параметра___", element, "обр_ФОП_Количество")
+            if element_type.GetParamValue(IFC_FAMILY):
+                if not element.GetParam(AMOUNT_SHARED_PARAM).HasValue:
+                    self.__add_error("Арматура___Отсутствует значение у параметра___", element, AMOUNT_SHARED_PARAM)
             else:
-                if not element.GetParam("Количество").HasValue:
-                    self.__add_error("Арматура___Отсутствует значение у параметра___", element, "Количество")
+                if not element.GetParam(AMOUNT).HasValue:
+                    self.__add_error("Арматура___Отсутствует значение у параметра___", element, AMOUNT)
 
         for element in self.__concrete:
             for parameter_name in concrete_inst_parameters:
@@ -190,28 +213,27 @@ class RevitRepository:
             return empty_parameters
 
     def filter_by_main_parameters(self):
-        filter_param_1 = "обр_ФОП_Фильтрация 1"
-        filter_param_2 = "обр_ФОП_Фильтрация 2"
-        filter_param_3 = "обр_ФОП_Форма_номер"
         filter_value = "Исключить из показателей качества"
 
-        self.__rebar = self.__filter_by_param(self.__rebar, filter_param_1, filter_value)
-        self.__rebar = self.__filter_by_param(self.__rebar, filter_param_2, filter_value)
-        self.__rebar = self.__filter_by_param(self.__rebar, filter_param_3, 1000)
+        self.__rebar = self.__filter_by_param(self.__rebar, FILTRATION_1, filter_value, False)
+        self.__rebar = self.__filter_by_param(self.__rebar, FILTRATION_2, filter_value, False)
+        self.__rebar = self.__filter_by_param(self.__rebar, FORM_NUMBER, 1000, False)
 
-        self.__concrete = self.__filter_by_param(self.__concrete, filter_param_1, filter_value)
-        self.__concrete = self.__filter_by_param(self.__concrete, filter_param_2, filter_value)
+        self.__concrete = self.__filter_by_param(self.__concrete, FILTRATION_1, filter_value, False)
+        self.__concrete = self.__filter_by_param(self.__concrete, FILTRATION_2, filter_value, False)
 
     def __get_all_concrete(self):
-        """
-        Получение из проекта всех экземпляров семейств категорий железобетона
-        """
-        all_categories = [Category.GetCategory(doc, BuiltInCategory.OST_Walls),
-                          Category.GetCategory(doc, BuiltInCategory.OST_StructuralColumns),
-                          Category.GetCategory(doc, BuiltInCategory.OST_StructuralFoundation),
-                          Category.GetCategory(doc, BuiltInCategory.OST_Floors),
-                          Category.GetCategory(doc, BuiltInCategory.OST_StructuralFraming)]
-        elements = self.__collect_elements_by_categories(all_categories)
+        all_categories = [BuiltInCategory.OST_Walls,
+                          BuiltInCategory.OST_StructuralColumns,
+                          BuiltInCategory.OST_StructuralFoundation,
+                          BuiltInCategory.OST_Floors,
+                          BuiltInCategory.OST_StructuralFraming]
+        categories_typed = List[BuiltInCategory]()
+        for category in all_categories:
+            categories_typed.Add(category)
+        multi_cat_filter = ElementMulticategoryFilter(categories_typed)
+        elements = FilteredElementCollector(self.doc).WherePasses(multi_cat_filter)
+        elements.WhereElementIsNotElementType()
         return elements
 
     def __get_all_rebar(self):
@@ -229,8 +251,8 @@ class RevitRepository:
         constr_sections = [x.text_value for x in constr_sections]
         filtered_elements = []
         for element in self.concrete:
-            if element.GetParamValue("ФОП_Секция СМР") in buildings:
-                if element.GetParamValue("обр_ФОП_Раздел проекта") in constr_sections:
+            if element.GetParamValue(BUILDING_NUMBER) in buildings:
+                if element.GetParamValue(SECTION_NUMBER) in constr_sections:
                     filtered_elements.append(element)
         return filtered_elements
 
@@ -241,23 +263,15 @@ class RevitRepository:
         rebar_group_values = [x.rebar_group for x in self.quality_indexes if x.index_type == "mass"]
         rebar_group_values = [name for group in rebar_group_values for name in group]
         for value in rebar_group_values:
-            rebar_by_table_type += self.__filter_by_param(self.rebar, "обр_ФОП_Группа КР", value)
+            rebar_by_table_type += self.__filter_by_param(self.rebar, CONSTR_GROUP, value)
         filtered_elements = []
         for element in rebar_by_table_type:
-            if element.GetParamValue("ФОП_Секция СМР") in buildings:
-                if element.GetParamValue("обр_ФОП_Раздел проекта") in constr_sections:
+            if element.GetParamValue(BUILDING_NUMBER) in buildings:
+                if element.GetParamValue(SECTION_NUMBER) in constr_sections:
                     filtered_elements.append(element)
         return filtered_elements
 
-    def __collect_elements_by_categories(self, categories):
-        cat_filters = [ElementCategoryFilter(x.Id) for x in categories]
-        cat_filters_typed = List[ElementFilter](cat_filters)
-        logical_or_filter = LogicalOrFilter(cat_filters_typed)
-        elements = FilteredElementCollector(self.doc).WherePasses(logical_or_filter)
-        elements.WhereElementIsNotElementType().ToElements()
-        return elements
-
-    def __filter_by_param(self, elements, param_name, value):
+    def __filter_by_param(self, elements, param_name, value, is_include=True):
         filtered_list = []
         for element in elements:
             if element.IsExistsParam(param_name):
@@ -266,7 +280,7 @@ class RevitRepository:
                 element_type = self.doc.GetElement(element.GetTypeId())
                 param_value = element_type.GetParamValueOrDefault(param_name, 0)
 
-            if param_value != value:
+            if (param_value == value) == is_include:
                 filtered_list.append(element)
         return filtered_list
 
@@ -492,29 +506,29 @@ class Construction:
         rebar_mass = 0
         for element in elements:
             element_type = doc.GetElement(element.GetTypeId())
-            is_ifc_element = element_type.GetParamValue("мод_ФОП_IFC семейство")
-            if element.IsExistsParam("мод_ФОП_Диаметр"):
-                diameter_param = element.GetParam("мод_ФОП_Диаметр")
+            is_ifc_element = element_type.GetParamValue(IFC_FAMILY)
+            if element.IsExistsParam(REBAR_DIAMETER):
+                diameter_param = element.GetParam(REBAR_DIAMETER)
             else:
-                diameter_param = element_type.GetParam("мод_ФОП_Диаметр")
+                diameter_param = element_type.GetParam(REBAR_DIAMETER)
             diameter = convert_value(diameter_param)
             mass_per_metr = self.__diameter_dict[diameter]
 
             if hasattr(element, "DistributionType"):
                 if element.DistributionType == DB.Structure.DistributionType.Uniform:
-                    length_param = element.GetParam("обр_ФОП_Длина")
+                    length_param = element.GetParam(REBAR_LENGTH)
                 elif element.DistributionType == DB.Structure.DistributionType.VaryingLength:
-                    length_param = element.GetParam("Полная длина стержня")
+                    length_param = element.GetParam(ROD_LENGTH)
             else:
-                length_param = element.GetParam("обр_ФОП_Длина")
+                length_param = element.GetParam(REBAR_LENGTH)
             length = convert_value(length_param) * 0.001
 
             if is_ifc_element:
-                amount = element.GetParamValue("обр_ФОП_Количество")
+                amount = element.GetParamValue(AMOUNT_SHARED_PARAM)
             else:
-                amount = element.GetParamValue("Количество")
-            amount_on_level = element.GetParamValue("обр_ФОП_Количество типовых на этаже")
-            levels_amount = element.GetParamValue("обр_ФОП_Количество типовых этажей")
+                amount = element.GetParamValue(AMOUNT)
+            amount_on_level = element.GetParamValue(AMOUNT_ON_LEVEL)
+            levels_amount = element.GetParamValue(AMOUNT_OF_LEVELS)
 
             element_mass = mass_per_metr * length * amount * amount_on_level * levels_amount
             rebar_mass += element_mass
@@ -529,19 +543,19 @@ class Construction:
 
     def __calculate_concrete_volume(self):
         for element in self.concrete:
-            volume_param = element.GetParam("Объем")
+            volume_param = element.GetParam(VOLUME)
             volume = convert_value(volume_param)
             self.__concrete_volume += volume
 
     def __group_rebar_by_function(self):
         for element in self.rebar:
-            rebar_function = element.LookupParameter("обр_ФОП_Группа КР").AsString()
+            rebar_function = element.GetParamValue(CONSTR_GROUP)
             self.__rebar_by_function.setdefault(rebar_function, [])
             self.__rebar_by_function[rebar_function].append(element)
 
     def __set_building_info(self):
-        project_info = FilteredElementCollector(doc).OfClass(ProjectInfo).FirstElement()
-        value = project_info.GetParamValue("Наименование здания")
+        project_info = doc.ProjectInformation
+        value = project_info.GetParamValue(BUILDING_INFO)
         self.__quality_indexes["Этажность здания, тип секции"] = value
 
     def __set_elements_sizes(self):
@@ -553,16 +567,16 @@ class Construction:
             for element in self.concrete:
                 element_type = doc.GetElement(element.GetTypeId())
                 if element.Category.Id == columns_category.Id:
-                    if element_type.IsExistsParam("ADSK_Размер_Высота") and element_type.IsExistsParam(
-                            "ADSK_Размер_Ширина"):
-                        height = element_type.GetParam("ADSK_Размер_Высота").AsValueString()
-                        width = element_type.GetParam("ADSK_Размер_Ширина").AsValueString()
+                    if element_type.IsExistsParam(HEIGHT_ADSK) and element_type.IsExistsParam(
+                            WIDTH_ADSK):
+                        height = element_type.GetParam(HEIGHT_ADSK).AsValueString()
+                        width = element_type.GetParam(WIDTH_ADSK).AsValueString()
                         size = height + "х" + width
                         elements_sizes.add(size)
                 if element.Category.Id == walls_category.Id:
-                    if element_type.IsExistsParam("Толщина") and element.IsExistsParam("Длина"):
-                        height = element.GetParam("Длина").AsValueString()
-                        width = element_type.GetParam("Толщина").AsValueString()
+                    if element_type.IsExistsParam(THICKNESS) and element.IsExistsParam(LENGTH):
+                        height = element.GetParam(LENGTH).AsValueString()
+                        width = element_type.GetParam(THICKNESS).AsValueString()
                         size = height + "х" + width
                         elements_sizes.add(size)
             elements_sizes = sorted(list(elements_sizes))
@@ -588,8 +602,8 @@ class Construction:
         elements_sizes = set()
         for element in elements:
             element_type = doc.GetElement(element.GetTypeId())
-            if element_type.IsExistsParam("Толщина"):
-                width = element_type.GetParam("Толщина").AsValueString()
+            if element_type.IsExistsParam(THICKNESS):
+                width = element_type.GetParam(THICKNESS).AsValueString()
                 elements_sizes.add(width)
         elements_sizes = sorted(list(elements_sizes))
         return elements_sizes
@@ -598,8 +612,8 @@ class Construction:
         concrete_classes = set()
         for element in self.concrete:
             element_type = doc.GetElement(element.GetTypeId())
-            if element_type.IsExistsParam("обр_ФОП_Марка бетона B"):
-                value = element_type.GetParam("обр_ФОП_Марка бетона B").AsValueString()
+            if element_type.IsExistsParam(CONCRETE_MARK):
+                value = element_type.GetParam(CONCRETE_MARK).AsValueString()
                 concrete_class = "В" + value
                 concrete_classes.add(concrete_class)
         self.__quality_indexes["Класс бетона"] = ", ".join(concrete_classes)
@@ -808,13 +822,22 @@ class CreateQualityTableCommand(ICommand):
             construction = Construction(selected_table_type, concrete, rebar)
             quality_table = QualityTable(selected_table_type, construction, selected_blds, selected_sctns)
             quality_table.create_table()
+        return True
 
 
 class MainWindow(WPFWindow):
     def __init__(self):
         self._context = None
-        self.xaml_source = op.join(op.dirname(__file__), 'MainWindow.xaml')
+        self.xaml_source = op.join(op.dirname(__file__), "MainWindow.xaml")
         super(MainWindow, self).__init__(self.xaml_source)
+
+    def ButtonOK_Click(self, sender, e):
+        self.DialogResult = True
+        show_executed_script_notification()
+
+    def ButtonCancel_Click(self, sender, e):
+        self.DialogResult = False
+        self.Close()
 
 
 class MainWindowViewModel(Reactive):
@@ -889,17 +912,11 @@ def convert_value(parameter):
         value = parameter.AsValueString()
 
     if int(app.VersionNumber) > 2021:
-        try:
-            d_type = parameter.GetUnitTypeId()
-            result = UnitUtils.ConvertFromInternalUnits(value, d_type)
-        except:
-            result = value
+        d_type = parameter.GetUnitTypeId()
+        result = UnitUtils.ConvertFromInternalUnits(value, d_type)
     else:
-        try:
-            d_type = parameter.DisplayUnitType
-            result = UnitUtils.ConvertFromInternalUnits(value, d_type)
-        except:
-            result = value
+        d_type = parameter.DisplayUnitType
+        result = UnitUtils.ConvertFromInternalUnits(value, d_type)
     return result
 
 
@@ -919,7 +936,7 @@ def script_execute(plugin_logger):
 
     walls_cat = Category.GetCategory(doc, BuiltInCategory.OST_Walls)
     columns_cat = Category.GetCategory(doc, BuiltInCategory.OST_StructuralColumns)
-    foundation_cat = Category.GetCategory(doc, BuiltInCategory.OST_Doors)
+    foundation_cat = Category.GetCategory(doc, BuiltInCategory.OST_StructuralFoundation)
     floor_cat = Category.GetCategory(doc, BuiltInCategory.OST_Floors)
     framing_cat = Category.GetCategory(doc, BuiltInCategory.OST_StructuralFraming)
 
@@ -955,7 +972,7 @@ def script_execute(plugin_logger):
         QualityIndex("Общий расход, кг/м3", "8")]
 
     foundation_table_type = TableType("Фундаментная плита")
-    foundation_table_type.categories = [foundation_cat]
+    foundation_table_type.categories = [floor_cat, foundation_cat]
     foundation_table_type.type_key_word = ["ФПлита"]
     foundation_table_type.indexes_info = [
         QualityIndex("Этажность здания, тип секции", "1"),
@@ -1039,6 +1056,8 @@ def script_execute(plugin_logger):
     main_window = MainWindow()
     main_window.DataContext = MainWindowViewModel(revit_repository, table_types)
     main_window.show_dialog()
+    if not main_window.DialogResult:
+        script.exit()
 
 
 script_execute()

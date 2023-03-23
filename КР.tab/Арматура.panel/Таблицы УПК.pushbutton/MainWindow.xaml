@@ -33,14 +33,14 @@
         <ComboBox
             Grid.Row="1"
             Grid.ColumnSpan="2"
-            Margin="5"
+            Margin="10,5,10,5"
             ItemsSource="{Binding table_types}"
             DisplayMemberPath="name"
             SelectedItem="{Binding selected_table_type}"/>
 
         <ListView
             Grid.Row="2" Grid.Column="0"
-            Margin="10,5,10,5"
+            Margin="10,5,5,5"
             ItemsSource="{Binding buildings, UpdateSourceTrigger=PropertyChanged}">
             <ListView.View>
                 <GridView>
@@ -52,7 +52,7 @@
                         </GridViewColumn.CellTemplate>
                     </GridViewColumn>
                     <GridViewColumn
-                        Header="Имя" Width="220"
+                        Header="Секции" Width="180"
                         DisplayMemberBinding="{Binding number}"/>
                 </GridView>
             </ListView.View>
@@ -60,7 +60,7 @@
 
         <ListView
             Grid.Row="2" Grid.Column="1"
-            Margin="10,5,10,5"
+            Margin="5,5,10,5"
             ItemsSource="{Binding construction_sections, UpdateSourceTrigger=PropertyChanged}">
             <ListView.View>
                 <GridView>
@@ -72,12 +72,11 @@
                         </GridViewColumn.CellTemplate>
                     </GridViewColumn>
                     <GridViewColumn
-                        Header="Имя" Width="220"
+                        Header="Разделы" Width="180"
                         DisplayMemberBinding="{Binding number}"/>
                 </GridView>
             </ListView.View>
         </ListView>
-
 
         <StackPanel
             Grid.Row="3"
@@ -93,12 +92,14 @@
             <Button
                 Width="100"
                 Margin="10, 0"
+                Content="Создать"
                 Command="{Binding create_tables_command}"
-                Content="Создать"/>
+                Click="ButtonOK_Click"/>
             <Button
                 Width="100"
                 Content="Отмена"
-                IsCancel="true"/>
+                IsCancel="true"
+                Click="ButtonCancel_Click"/>
         </StackPanel>
     </Grid>
 </Window>
