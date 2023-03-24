@@ -43,6 +43,8 @@ AMOUNT_ON_LEVEL = "обр_ФОП_Количество типовых на эта
 AMOUNT_OF_LEVELS = "обр_ФОП_Количество типовых этажей"
 REBAR_DIAMETER = "мод_ФОП_Диаметр"
 REBAR_LENGTH = "обр_ФОП_Длина"
+REBAR_CALC_METERS = "обр_ФОП_Расчет в погонных метрах"
+REBAR_MASS_PER_LENGTH = "обр_ФОП_Масса на единицу длины"
 ROD_LENGTH = "Полная длина стержня"
 IFC_FAMILY = "мод_ФОП_IFC семейство"
 
@@ -121,7 +123,9 @@ class RevitRepository:
         rebar_uniform_length_parameter = [REBAR_LENGTH]
         rebar_vary_length_parameter = [ROD_LENGTH]
         rebar_type_parameters = [IFC_FAMILY]
-        rebar_inst_type_parameters = [REBAR_DIAMETER]
+        rebar_inst_type_parameters = [REBAR_DIAMETER,
+                                      REBAR_CALC_METERS]
+        rebar_inst_type_by_number_parameters = [REBAR_MASS_PER_LENGTH]
 
         for element in self.__rebar:
             element_type = self.doc.GetElement(element.GetTypeId())
@@ -151,6 +155,16 @@ class RevitRepository:
                 if not element.IsExistsParam(parameter_name) and not element_type.IsExistsParam(parameter_name):
                     self.__add_error("Арматура___Отсутствует параметр у экземпляра или типоразмера___", element, parameter_name)
 
+            for parameter_name in rebar_inst_type_by_number_parameters:
+                if element.IsExistsParam(FORM_NUMBER):
+                    number_value = element.GetParamValue(FORM_NUMBER)
+                elif element_type.IsExistsParam(FORM_NUMBER):
+                    number_value = element_type.GetParamValue(FORM_NUMBER)
+
+                if number_value >= 200:
+                    if not element.IsExistsParam(parameter_name) and not element_type.IsExistsParam(parameter_name):
+                        self.__add_error("Арматура___Отсутствует параметр у экземпляра или типоразмера___", element, parameter_name)
+
             if not element.IsExistsParam(AMOUNT_SHARED_PARAM) and not element.IsExistsParam(AMOUNT):
                 self.__add_error("Арматура___Отсутствует параметр___", element, "{0} (для IFC - '{1}')".format(AMOUNT, AMOUNT_SHARED_PARAM))
 
@@ -166,7 +180,9 @@ class RevitRepository:
                                  AMOUNT_OF_LEVELS]
         rebar_uniform_length_parameter = [REBAR_LENGTH]
         rebar_vary_length_parameter = [ROD_LENGTH]
-        rebar_inst_type_parameters = [REBAR_DIAMETER]
+        rebar_inst_type_parameters = [REBAR_DIAMETER,
+                                      REBAR_CALC_METERS]
+        rebar_inst_type_by_number_parameters = [REBAR_MASS_PER_LENGTH]
 
         for element in self.__rebar:
             element_type = self.doc.GetElement(element.GetTypeId())
@@ -195,6 +211,20 @@ class RevitRepository:
                 else:
                     if not element_type.GetParam(parameter_name).HasValue:
                         self.__add_error("Арматура___Отсутствует значение у параметра (экземпляра или типа)___", element, parameter_name)
+
+            for parameter_name in rebar_inst_type_by_number_parameters:
+                if element.IsExistsParam(FORM_NUMBER):
+                    number_value = element.GetParamValue(FORM_NUMBER)
+                elif element_type.IsExistsParam(FORM_NUMBER):
+                    number_value = element_type.GetParamValue(FORM_NUMBER)
+
+                if number_value >= 200:
+                    if element.IsExistsParam(parameter_name):
+                        if not element.GetParam(parameter_name).HasValue:
+                            self.__add_error("Арматура___Отсутствует значение у параметра (экземпляра или типа)___", element, parameter_name)
+                    else:
+                        if not element_type.GetParam(parameter_name).HasValue:
+                            self.__add_error("Арматура___Отсутствует значение у параметра (экземпляра или типа)___", element, parameter_name)
 
             if element_type.GetParamValue(IFC_FAMILY):
                 if not element.GetParam(AMOUNT_SHARED_PARAM).HasValue:
@@ -490,6 +520,19 @@ class Construction:
             40: 9.805
         }
 
+        self.__intersection_dict = {
+            8: 1.034,
+            10: 1.043,
+            12: 1.051,
+            14: 1.060,
+            16: 1.068,
+            18: 1.077,
+            20: 1.085,
+            22: 1.094,
+            25: 1.107,
+            28: 1.120
+        }
+
         self.__concrete_volume = 0
         self.__calculate_concrete_volume()
 
@@ -507,13 +550,32 @@ class Construction:
         for element in elements:
             element_type = doc.GetElement(element.GetTypeId())
             is_ifc_element = element_type.GetParamValue(IFC_FAMILY)
+
+            # diameter
             if element.IsExistsParam(REBAR_DIAMETER):
                 diameter_param = element.GetParam(REBAR_DIAMETER)
             else:
                 diameter_param = element_type.GetParam(REBAR_DIAMETER)
             diameter = convert_value(diameter_param)
-            mass_per_metr = self.__diameter_dict[diameter]
 
+            # mass per meter
+            if element.IsExistsParam(FORM_NUMBER):
+                form_number = element.GetParamValue(FORM_NUMBER)
+            else:
+                form_number = element_type.GetParamValue(FORM_NUMBER)
+
+            if form_number < 200:
+                if diameter in self.__diameter_dict.keys():
+                    mass_per_metr = self.__diameter_dict[diameter]
+                else:
+                    mass_per_metr = 0
+            else:
+                if element.IsExistsParam(REBAR_MASS_PER_LENGTH):
+                    mass_per_metr = element.GetParamValue(REBAR_MASS_PER_LENGTH)
+                else:
+                    mass_per_metr = element_type.GetParamValue(REBAR_MASS_PER_LENGTH)
+
+            # length
             if hasattr(element, "DistributionType"):
                 if element.DistributionType == DB.Structure.DistributionType.Uniform:
                     length_param = element.GetParam(REBAR_LENGTH)
@@ -523,6 +585,24 @@ class Construction:
                 length_param = element.GetParam(REBAR_LENGTH)
             length = convert_value(length_param) * 0.001
 
+            # type of calculation
+            if element.IsExistsParam(REBAR_CALC_METERS):
+                calculation_by_meters = element.GetParamValue(REBAR_CALC_METERS)
+            else:
+                calculation_by_meters = element_type.GetParamValue(REBAR_CALC_METERS)
+
+            if calculation_by_meters:
+                if length <= 11.7:
+                    intersection_coef = 1
+                else:
+                    if length in self.__intersection_dict.keys():
+                        intersection_coef = self.__intersection_dict[length]
+                    else:
+                        intersection_coef = 1.1
+                unit_mass = mass_per_metr * round(length * intersection_coef, 2)
+            else:
+                unit_mass = round(length * mass_per_metr, 2)
+
             if is_ifc_element:
                 amount = element.GetParamValue(AMOUNT_SHARED_PARAM)
             else:
@@ -530,7 +610,7 @@ class Construction:
             amount_on_level = element.GetParamValue(AMOUNT_ON_LEVEL)
             levels_amount = element.GetParamValue(AMOUNT_OF_LEVELS)
 
-            element_mass = mass_per_metr * length * amount * amount_on_level * levels_amount
+            element_mass = unit_mass * amount * amount_on_level * levels_amount
             rebar_mass += element_mass
 
         return rebar_mass
@@ -833,7 +913,6 @@ class MainWindow(WPFWindow):
 
     def ButtonOK_Click(self, sender, e):
         self.DialogResult = True
-        show_executed_script_notification()
 
     def ButtonCancel_Click(self, sender, e):
         self.DialogResult = False
