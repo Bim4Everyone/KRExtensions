@@ -180,8 +180,8 @@ class RevitRepository:
                                  AMOUNT_OF_LEVELS]
         rebar_uniform_length_parameter = [REBAR_LENGTH]
         rebar_vary_length_parameter = [ROD_LENGTH]
-        rebar_inst_type_parameters = [REBAR_DIAMETER,
-                                      REBAR_CALC_METERS]
+        rebar_inst_type_parameters = [REBAR_CALC_METERS]
+        rebar_inst_type_diameter_parameters = [REBAR_DIAMETER]
         rebar_inst_type_by_number_parameters = [REBAR_MASS_PER_LENGTH]
 
         for element in self.__rebar:
@@ -211,6 +211,22 @@ class RevitRepository:
                 else:
                     if not element_type.GetParam(parameter_name).HasValue:
                         self.__add_error("Арматура___Отсутствует значение у параметра (экземпляра или типа)___", element, parameter_name)
+
+            for parameter_name in rebar_inst_type_diameter_parameters:
+                if element.IsExistsParam(FORM_NUMBER):
+                    form_number = element.GetParamValueOrDefault(FORM_NUMBER)
+                else:
+                    form_number = element_type.GetParamValueOrDefault(FORM_NUMBER)
+
+                if form_number < 200:
+                    if element.IsExistsParam(parameter_name):
+                        if not element.GetParam(parameter_name).HasValue:
+                            self.__add_error("Арматура___Отсутствует значение у параметра (экземпляра или типа)___",
+                                             element, parameter_name)
+                    else:
+                        if not element_type.GetParam(parameter_name).HasValue:
+                            self.__add_error("Арматура___Отсутствует значение у параметра (экземпляра или типа)___",
+                                             element, parameter_name)
 
             for parameter_name in rebar_inst_type_by_number_parameters:
                 if element.IsExistsParam(FORM_NUMBER):
@@ -594,9 +610,12 @@ class Construction:
             if calculation_by_meters:
                 if length <= 11.7:
                     intersection_coef = 1
+                elif hasattr(element, "DistributionType"):
+                    if element.DistributionType == DB.Structure.DistributionType.VaryingLength:
+                        intersection_coef = 1
                 else:
-                    if length in self.__intersection_dict.keys():
-                        intersection_coef = self.__intersection_dict[length]
+                    if diameter in self.__intersection_dict.keys():
+                        intersection_coef = self.__intersection_dict[diameter]
                     else:
                         intersection_coef = 1.1
                 unit_mass = mass_per_metr * round(length * intersection_coef, 2)
@@ -607,6 +626,11 @@ class Construction:
                 amount = element.GetParamValue(AMOUNT_SHARED_PARAM)
             else:
                 amount = element.GetParamValue(AMOUNT)
+                if hasattr(element, "DistributionType"):
+                    if element.DistributionType == DB.Structure.DistributionType.VaryingLength:
+                        amount = 1
+
+
             amount_on_level = element.GetParamValue(AMOUNT_ON_LEVEL)
             levels_amount = element.GetParamValue(AMOUNT_OF_LEVELS)
 
@@ -1051,7 +1075,7 @@ def script_execute(plugin_logger):
         QualityIndex("Общий расход, кг/м3", "8")]
 
     foundation_table_type = TableType("Фундаментная плита")
-    foundation_table_type.categories = [floor_cat, foundation_cat]
+    foundation_table_type.categories = [floor_cat, foundation_cat, walls_cat]
     foundation_table_type.type_key_word = ["ФПлита"]
     foundation_table_type.indexes_info = [
         QualityIndex("Этажность здания, тип секции", "1"),
