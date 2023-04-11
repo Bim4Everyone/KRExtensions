@@ -175,8 +175,7 @@ class RevitRepository:
     def check_parameters_values(self):
         self.__errors_dict = dict()
         concrete_inst_parameters = [VOLUME]
-        rebar_inst_parameters = [CONSTR_GROUP,
-                                 AMOUNT_ON_LEVEL,
+        rebar_inst_parameters = [AMOUNT_ON_LEVEL,
                                  AMOUNT_OF_LEVELS]
         rebar_uniform_length_parameter = [REBAR_LENGTH]
         rebar_vary_length_parameter = [ROD_LENGTH]
@@ -187,15 +186,15 @@ class RevitRepository:
         for element in self.__rebar:
             element_type = self.doc.GetElement(element.GetTypeId())
             for parameter_name in rebar_inst_parameters:
-                if not element.GetParam(parameter_name).HasValue:
+                if not element.GetParam(parameter_name).HasValue or element.GetParamValue(parameter_name) == None:
                     self.__add_error("Арматура___Отсутствует значение у параметра___", element, parameter_name)
 
             for parameter_name in rebar_uniform_length_parameter:
                 if hasattr(element, "DistributionType"):
                     if element.DistributionType == DB.Structure.DistributionType.Uniform:
-                        if not element.GetParam(parameter_name).HasValue:
+                        if not element.GetParam(parameter_name).HasValue or element.GetParamValue(parameter_name) == None:
                             self.__add_error("Арматура___Отсутствует значение у параметра___", element, parameter_name)
-                elif not element.GetParam(parameter_name).HasValue:
+                elif not element.GetParam(parameter_name).HasValue or element.GetParamValue(parameter_name) == None:
                     self.__add_error("Арматура___Отсутствует значение у параметра___", element, parameter_name)
 
             for parameter_name in rebar_vary_length_parameter:
@@ -220,11 +219,11 @@ class RevitRepository:
 
                 if form_number < 200:
                     if element.IsExistsParam(parameter_name):
-                        if not element.GetParam(parameter_name).HasValue:
+                        if not element.GetParam(parameter_name).HasValue or element.GetParamValue(parameter_name) == None:
                             self.__add_error("Арматура___Отсутствует значение у параметра (экземпляра или типа)___",
                                              element, parameter_name)
                     else:
-                        if not element_type.GetParam(parameter_name).HasValue:
+                        if not element_type.GetParam(parameter_name).HasValue or element_type.GetParamValue(parameter_name) == None:
                             self.__add_error("Арматура___Отсутствует значение у параметра (экземпляра или типа)___",
                                              element, parameter_name)
 
@@ -236,10 +235,10 @@ class RevitRepository:
 
                 if number_value >= 200:
                     if element.IsExistsParam(parameter_name):
-                        if not element.GetParam(parameter_name).HasValue:
+                        if not element.GetParam(parameter_name).HasValue or element.GetParamValue(parameter_name) == None:
                             self.__add_error("Арматура___Отсутствует значение у параметра (экземпляра или типа)___", element, parameter_name)
                     else:
-                        if not element_type.GetParam(parameter_name).HasValue:
+                        if not element_type.GetParam(parameter_name).HasValue or element_type.GetParamValue(parameter_name) == None:
                             self.__add_error("Арматура___Отсутствует значение у параметра (экземпляра или типа)___", element, parameter_name)
 
             if element_type.GetParamValue(IFC_FAMILY):
@@ -253,6 +252,19 @@ class RevitRepository:
             for parameter_name in concrete_inst_parameters:
                 if element.GetParamValue(parameter_name) == 0:
                     self.__add_error("Железобетон___Отсутствует значение у параметра___", element, parameter_name)
+
+        if self.__errors_dict:
+            empty_parameters = self.__create_error_list(self.__errors_dict)
+            return empty_parameters
+
+    def check_filtered_rebar(self, rebar):
+        self.__errors_dict = dict()
+        rebar_inst_parameters = [CONSTR_GROUP]
+
+        for element in rebar:
+            for parameter_name in rebar_inst_parameters:
+                if not element.GetParam(parameter_name).HasValue or element.GetParamValue(parameter_name) == None:
+                    self.__add_error("Арматура___Отсутствует значение у параметра___", element, parameter_name)
 
         if self.__errors_dict:
             empty_parameters = self.__create_error_list(self.__errors_dict)
@@ -302,20 +314,23 @@ class RevitRepository:
                     filtered_elements.append(element)
         return filtered_elements
 
-    def get_filtered_rebar_by_user(self, buildings, constr_sections):
+    def get_filtered_rebar_by_blds_and_scts(self, buildings, constr_sections):
         buildings = [x.text_value for x in buildings]
         constr_sections = [x.text_value for x in constr_sections]
-        rebar_by_table_type = []
-        rebar_group_values = [x.rebar_group for x in self.quality_indexes if x.index_type == "mass"]
-        rebar_group_values = [name for group in rebar_group_values for name in group]
-        for value in rebar_group_values:
-            rebar_by_table_type += self.__filter_by_param(self.rebar, CONSTR_GROUP, value)
         filtered_elements = []
-        for element in rebar_by_table_type:
+        for element in self.rebar:
             if element.GetParamValue(BUILDING_NUMBER) in buildings:
                 if element.GetParamValue(SECTION_NUMBER) in constr_sections:
                     filtered_elements.append(element)
         return filtered_elements
+
+    def get_filtered_rebar_by_table_type(self, rebar):
+        rebar_by_table_type = []
+        rebar_group_values = [x.rebar_group for x in self.quality_indexes if x.index_type == "mass"]
+        rebar_group_values = [name for group in rebar_group_values for name in group]
+        for value in rebar_group_values:
+            rebar_by_table_type += self.__filter_by_param(rebar, CONSTR_GROUP, value)
+        return rebar_by_table_type
 
     def __filter_by_param(self, elements, param_name, value, is_include=True):
         filtered_list = []
@@ -916,7 +931,16 @@ class CreateQualityTableCommand(ICommand):
         selected_blds = [x for x in buildings if x.is_checked]
         selected_sctns = [x for x in construction_sections if x.is_checked]
         concrete = self.__view_model.revit_repository.get_filtered_concrete_by_user(selected_blds, selected_sctns)
-        rebar = self.__view_model.revit_repository.get_filtered_rebar_by_user(selected_blds, selected_sctns)
+        rebar = self.__view_model.revit_repository.get_filtered_rebar_by_blds_and_scts(selected_blds, selected_sctns)
+        check = self.__view_model.revit_repository.check_filtered_rebar(rebar)
+        if check:
+            output = script.get_output()
+            output.print_table(table_data=check,
+                               title="Показатели качества",
+                               columns=["Категории", "Тип ошибки", "Название параметра", "Id"])
+            script.exit()
+        rebar = self.__view_model.revit_repository.get_filtered_rebar_by_table_type(rebar)
+
         if not concrete:
             alert("Не найден ЖБ для выбранных секций и разделов")
         elif not rebar:
