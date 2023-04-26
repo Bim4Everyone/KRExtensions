@@ -1,0 +1,10 @@
+title:
+  ru: Сгенерировать документацию
+  en_us: Generate Documentation
+
+tooltip:
+  ru: Создает документацию пилонов.
+  en_us: Creates pylon documentation.
+
+assembly: RevitPylonDocumentation.dll
+command_class: RevitPylonDocumentationCommand
