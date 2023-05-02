@@ -1,0 +1,10 @@
+title:
+  ru: Встряхнуть спецификации
+  en_us: Shake Specifications
+
+tooltip:
+  ru: Решает проблему зависания визуального отображения спецификаций на листах.
+  en_us: Solves the problem of hanging the visual display of specifications on sheets.
+
+assembly: RevitShakeSpecs.dll
+command_class: RevitShakeSpecsCommand
