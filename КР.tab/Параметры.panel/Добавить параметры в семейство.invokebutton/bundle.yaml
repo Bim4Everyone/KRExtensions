@@ -1,0 +1,10 @@
+title:
+  ru: Добавить параметры в семейство
+  en_us: Add parameters to family
+
+tooltip:
+  ru: Добавляет параметры в семейство.
+  en_us: Adds parameters to a family.
+
+assembly: RevitFamilyParameterAdder.dll
+command_class: RevitFamilyParameterAdderCommand
