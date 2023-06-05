@@ -7,4 +7,4 @@ tooltip:
   en_us: Analyzes the values of the user-selected parameter for elements in the view and creates filters for each of the values.
 
 assembly: RevitCreatingFiltersByValues.dll
-command_class: RevitCreatingFiltersByValues
+command_class: RevitCreatingFiltersByValuesCommand
