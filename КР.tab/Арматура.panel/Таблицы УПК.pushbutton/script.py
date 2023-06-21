@@ -625,9 +625,8 @@ class Construction:
             if calculation_by_meters:
                 if length <= 11.7:
                     intersection_coef = 1
-                elif hasattr(element, "DistributionType"):
-                    if element.DistributionType == DB.Structure.DistributionType.VaryingLength:
-                        intersection_coef = 1
+                elif hasattr(element, "DistributionType") and element.DistributionType == DB.Structure.DistributionType.VaryingLength:
+                    intersection_coef = 1
                 else:
                     if diameter in self.__intersection_dict.keys():
                         intersection_coef = self.__intersection_dict[diameter]
