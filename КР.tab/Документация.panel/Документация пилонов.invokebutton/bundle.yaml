@@ -1,0 +1,10 @@
+title:
+  ru: Документация пилонов
+  en_us: Pylon documentation
+
+tooltip:
+  ru: Работа с документацией пилонов, которая включает создание видов и спецификаций, размещение их на листах.
+  en_us: Working with pylon documentation, which includes creating views and specifications, placing them on sheets.
+
+assembly: RevitPylonDocumentation.dll
+command_class: RevitPylonDocumentationCommand
