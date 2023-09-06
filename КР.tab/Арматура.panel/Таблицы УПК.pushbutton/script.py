@@ -257,6 +257,8 @@ class RevitRepository:
             empty_parameters = self.__create_error_list(self.__errors_dict)
             return empty_parameters
 
+
+
     def check_filtered_rebar(self, rebar):
         self.__errors_dict = dict()
         rebar_inst_parameters = [CONSTR_GROUP]
@@ -367,8 +369,8 @@ class RevitRepository:
             error_info.append(", ".join(errors_dict[error]))
             missing_parameters.append(error_info)
         # pyrevit doesn't show a table with 3 lines
-        if len(missing_parameters) == 3:
-            missing_parameters.append(["_", "_", "_", "_"])
+        #if len(missing_parameters) == 3:
+        #    missing_parameters.append(["_", "_", "_", "_"])
         return missing_parameters
 
     def __get_elements_sections(self, parameter_name):
@@ -1155,28 +1157,49 @@ def script_execute(plugin_logger):
     revit_repository = RevitRepository(doc)
     check = revit_repository.check_exist_main_parameters()
     if check:
-        output = script.get_output()
-        output.print_table(table_data=check,
-                           title="Показатели качества",
-                           columns=["Категории", "Тип ошибки", "Название параметра", "Id"])
+        for error in check:
+            print("Категория ошибки: " + error[0])
+            print("Описание ошибки: " + error[1])
+            print("Название параметра: " + error[2])
+            print("ID элементов: " + error[3])
+
+            print("----------------------------------")
+        # output = script.get_output()
+        # output.print_table(table_data=check,
+        #                    title="Показатели качества",
+        #                    columns=["Категории", "Тип ошибки", "Название параметра", "Id"])
         script.exit()
 
     revit_repository.filter_by_main_parameters()
 
     check = revit_repository.check_exist_rebar_parameters()
     if check:
-        output = script.get_output()
-        output.print_table(table_data=check,
-                           title="Показатели качества",
-                           columns=["Категории", "Тип ошибки", "Название параметра", "Id"])
+        for error in check:
+            print("Категория ошибки: " + error[0])
+            print("Описание ошибки: " + error[1])
+            print("Название параметра: " + error[2])
+            print("ID элементов: " + error[3])
+
+            print("----------------------------------")
+        # output = script.get_output()
+        # output.print_table(table_data=check,
+        #                    title="Показатели качества",
+        #                    columns=["Категории", "Тип ошибки", "Название параметра", "Id"])
         script.exit()
 
     check = revit_repository.check_parameters_values()
     if check:
-        output = script.get_output()
-        output.print_table(table_data=check,
-                           title="Показатели качества",
-                           columns=["Категории", "Тип ошибки", "Название параметра", "Id"])
+        for error in check:
+            print("Категория ошибки: " + error[0])
+            print("Описание ошибки: " + error[1])
+            print("Название параметра: " + error[2])
+            print("ID элементов: " + error[3])
+
+            print("----------------------------------")
+        # output = script.get_output()
+        # output.print_table(table_data=check,
+        #                    title="Показатели качества",
+        #                    columns=["Категории", "Тип ошибки", "Название параметра", "Id"])
         script.exit()
 
     main_window = MainWindow()
