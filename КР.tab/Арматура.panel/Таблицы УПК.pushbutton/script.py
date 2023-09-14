@@ -368,9 +368,39 @@ class RevitRepository:
                 error_info.append(word)
             error_info.append(", ".join(errors_dict[error]))
             missing_parameters.append(error_info)
-        # pyrevit doesn't show a table with 3 lines
-        #if len(missing_parameters) == 3:
-        #    missing_parameters.append(["_", "_", "_", "_"])
+
+        # Attention! Unknown error found!
+
+        # An issue was found when creating a table in the error report window,
+        # which is created using the print_table() function from the pyRevit library.
+        # The table is not created under certain conditions, and no errors occur.
+        # For example, under the conditions - two identical lines of data, four
+        # columns and in two adjacent cells of one line there are 17 characters
+        # (numbers) and 52 characters (letters of the Russian alphabet).
+        # The pyRevit and Markdown libraries were checked, but no solution was found.
+        # It was found that adding an empty row to the end of the table solved
+        # the problem, so let's implement it.
+
+        # Была найдена проблема при создании таблицы в окне отчета об ошибках, которая создается
+        # при помощи функции print_table() из библиотеки pyRevit. Таблица не создается при определенных условиях,
+        # при этом не возникает никаких ошибок. Условия, при которых возникает проблема, связаны с количеством строк
+        # и количеством символов в двух соседних ячейках одной строки. Например таблица не отображалась при 2 строках данных
+        # и наличии в двух соседних ячейках текста количеством 17 символов (цифры) и 52 символа (буквы русского алфавита).
+        # Проблема также наблюдается при написании текста английского алфавита при в 2 раза меньшем количестве символов.
+        # Наблюдались и другие комбинации количество строк/символов, которые приводят к проблеме.
+        # Поиск решения данной проблемы ни к чему не привел. Были проанализированы библиотеки pyRevit и Markdown.
+        # В pyRevit функция print_table() преобразует передаваемый в нее список в строку в соответствии с системой разметки
+        # Markdown и затем передает ее в функцию print_md() библиотеки pyRevit. В ней при помощи библиотеки Markdown строка преобразуется
+        # в код HTML. При этом в функцию передается расширение, являющееся дополнительным конфигуратором данных для формирования
+        # таблицы. Данное расширение создано на основе того, что представлено в стандартной библиотеке Markdown, но отчасти изменено.
+        # Помимо этого в print_md() выполняеются дополнительные преобразования кода для корректности отображения в браузере
+        # и в конце происходит печать print(html_code, end="").
+        # На каждом этапе получаемая строка/html-код были проверены и ошибок найдено не было, исходя из этого пришли к выводу,
+        # что проблема возникает в момент отображения html-кода во встроенном браузере окна от pyRevit.
+        # Т.к. доступа для редактирования окна не имели приняли решения воспользоваться заглушкой в виде добавления в конец таблицы
+        # дополнительной строки, содержащей в каждой ячейке "_", которая показала свою эффективность.
+
+        missing_parameters.append(["_", "_", "_", "_"])
         return missing_parameters
 
     def __get_elements_sections(self, parameter_name):
@@ -1157,49 +1187,50 @@ def script_execute(plugin_logger):
     revit_repository = RevitRepository(doc)
     check = revit_repository.check_exist_main_parameters()
     if check:
-        for error in check:
-            print("Категория ошибки: " + error[0])
-            print("Описание ошибки: " + error[1])
-            print("Название параметра: " + error[2])
-            print("ID элементов: " + error[3])
-
-            print("----------------------------------")
-        # output = script.get_output()
-        # output.print_table(table_data=check,
-        #                    title="Показатели качества",
-        #                    columns=["Категории", "Тип ошибки", "Название параметра", "Id"])
+        # Данный код оставлен для быстрого тестирования неизвестной ошибки, описанной в функции __create_error_list()
+        # for error in check:
+        #     print("Категория ошибки: " + error[0])
+        #     print("Описание ошибки: " + error[1])
+        #     print("Название параметра: " + error[2])
+        #     print("ID элементов: " + error[3])
+        #
+        #     print("----------------------------------")
+        output = script.get_output()
+        output.print_table(table_data=check,
+                           title="Показатели качества",
+                           columns=["Категории", "Тип ошибки", "Название параметра", "Id"])
         script.exit()
 
     revit_repository.filter_by_main_parameters()
 
     check = revit_repository.check_exist_rebar_parameters()
     if check:
-        for error in check:
-            print("Категория ошибки: " + error[0])
-            print("Описание ошибки: " + error[1])
-            print("Название параметра: " + error[2])
-            print("ID элементов: " + error[3])
-
-            print("----------------------------------")
-        # output = script.get_output()
-        # output.print_table(table_data=check,
-        #                    title="Показатели качества",
-        #                    columns=["Категории", "Тип ошибки", "Название параметра", "Id"])
+        # for error in check:
+        #     print("Категория ошибки: " + error[0])
+        #     print("Описание ошибки: " + error[1])
+        #     print("Название параметра: " + error[2])
+        #     print("ID элементов: " + error[3])
+        #
+        #     print("----------------------------------")
+        output = script.get_output()
+        output.print_table(table_data=check,
+                           title="Показатели качества",
+                           columns=["Категории", "Тип ошибки", "Название параметра", "Id"])
         script.exit()
 
     check = revit_repository.check_parameters_values()
     if check:
-        for error in check:
-            print("Категория ошибки: " + error[0])
-            print("Описание ошибки: " + error[1])
-            print("Название параметра: " + error[2])
-            print("ID элементов: " + error[3])
-
-            print("----------------------------------")
-        # output = script.get_output()
-        # output.print_table(table_data=check,
-        #                    title="Показатели качества",
-        #                    columns=["Категории", "Тип ошибки", "Название параметра", "Id"])
+        # for error in check:
+        #     print("Категория ошибки: " + error[0])
+        #     print("Описание ошибки: " + error[1])
+        #     print("Название параметра: " + error[2])
+        #     print("ID элементов: " + error[3])
+        #
+        #     print("----------------------------------")
+        output = script.get_output()
+        output.print_table(table_data=check,
+                           title="Показатели качества",
+                           columns=["Категории", "Тип ошибки", "Название параметра", "Id"])
         script.exit()
 
     main_window = MainWindow()
