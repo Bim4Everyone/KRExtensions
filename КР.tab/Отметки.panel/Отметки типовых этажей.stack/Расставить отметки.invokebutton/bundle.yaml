@@ -8,3 +8,6 @@ tooltip:
 
 assembly: RevitMarkPlacement.dll
 command_class: PlaceAnnotationCommand
+
+min_revit_version: 2020
+max_revit_version: 2022

@@ -7,3 +7,6 @@ tooltip:
   en_us: Disables the display of 3D reinforcement in the current 3D view.
 
 author: dosymep
+
+min_revit_version: 2020
+max_revit_version: 2022
