@@ -2,7 +2,7 @@
     "builtin": "False",
     "default_enabled": "True",
     "type": "extension",
-    "rocket_mode_compatible": "True",
+    "rocket_mode_compatible": "False",
     "name": "03.KR",
     "description": "Конструктив",
     "author": "dosymep",
