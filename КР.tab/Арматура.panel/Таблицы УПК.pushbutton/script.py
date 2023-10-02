@@ -940,7 +940,10 @@ class CreateQualityTableCommand(ICommand):
         self.CanExecuteChanged -= value
 
     def OnCanExecuteChanged(self):
-        self._canExecuteChanged(self, System.EventArgs.Empty)
+        # В Python при работе с событиями нужно явно
+        # передавать импорт в обработчике события
+        from System import EventArgs
+        self._canExecuteChanged(self, EventArgs.Empty)
 
     def ViewModel_PropertyChanged(self, sender, e):
         self.OnCanExecuteChanged()
