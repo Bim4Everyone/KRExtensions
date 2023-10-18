@@ -828,8 +828,12 @@ class QualityTable:
         schedules = FilteredElementCollector(doc).OfClass(ViewSchedule)
         fvp = ParameterValueProvider(ElementId(BuiltInParameter.VIEW_NAME))
         rule = FilterStringEquals()
-        case_sens = False
-        filter_rule = FilterStringRule(fvp, rule, self.schedule_name, case_sens)
+        if int(app.VersionNumber) < 2023:
+            case_sens = False
+            filter_rule = FilterStringRule(fvp, rule, self.schedule_name, case_sens)
+        else:
+            filter_rule = FilterStringRule(fvp, rule, self.schedule_name)
+
         name_filter = ElementParameterFilter(filter_rule)
         schedules.WherePasses(name_filter)
         return schedules.FirstElement()
