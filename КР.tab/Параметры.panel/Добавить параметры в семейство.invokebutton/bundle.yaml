@@ -9,5 +9,7 @@ tooltip:
 assembly: RevitFamilyParameterAdder.dll
 command_class: RevitFamilyParameterAdderCommand
 
+author: DivinN
+
 min_revit_version: 2020
-max_revit_version: 2022
+max_revit_version: 2024
