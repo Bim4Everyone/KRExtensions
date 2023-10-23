@@ -619,7 +619,7 @@ class Construction:
                 diameter_param = element.GetParam(REBAR_DIAMETER)
             else:
                 diameter_param = element_type.GetParam(REBAR_DIAMETER)
-            diameter = convert_value(diameter_param)
+            diameter = int(round(convert_value(diameter_param)))
 
             # mass per meter
             if element.IsExistsParam(FORM_NUMBER):
