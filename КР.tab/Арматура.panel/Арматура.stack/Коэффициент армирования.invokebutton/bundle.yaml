@@ -1,12 +1,12 @@
 title:
   ru: Коэффициент армирования
-  en_us: Коэффициент армирования
+  en_us: Reinforcement coefficient
 
 tooltip:
   ru: >- 
-    Please Write Description
+    Записывает значение коэффициента армирования в опалубочные элементы, видимые на виде
   en_us: >- 
-    Please Write Description
+    Writes the value of the reinforcement coefficient to the formwork elements visible in the view
 
 assembly: RevitReinforcementCoefficient.dll
 command_class: RevitReinforcementCoefficientCommand
