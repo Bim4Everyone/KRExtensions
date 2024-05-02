@@ -9,5 +9,7 @@ tooltip:
 assembly: RevitMarkPlacement.dll
 command_class: PlaceAnnotationCommand
 
+help_url: "https://wiki.a101.ru/pages/viewpage.action?pageId=9211117"
+
 min_revit_version: 2020
 max_revit_version: 2024
