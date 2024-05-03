@@ -10,6 +10,7 @@ assembly: RevitPylonDocumentation.dll
 command_class: RevitPylonDocumentationCommand
 
 author: DivinN
+help_url: "https://wiki.a101.ru/pages/viewpage.action?pageId=9211207"
 
 min_revit_version: 2020
 max_revit_version: 2024
