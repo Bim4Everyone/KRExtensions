@@ -1,12 +1,12 @@
 title:
   ru: Значения параметров при создании
-  en_us: Значения параметров при создании
+  en_us: Parameter values during creation
 
 tooltip:
   ru: >- 
-    Please Write Description
+    Производит автоматическую запись значений параметров в зависимости от выбора пользователя после создания элементов
   en_us: >- 
-    Please Write Description
+    Automatically records parameter values depending on user selection after elements are created
 
 assembly: RevitParamValuesByEvents.dll
 command_class: RevitParamValuesByEventsCommand
