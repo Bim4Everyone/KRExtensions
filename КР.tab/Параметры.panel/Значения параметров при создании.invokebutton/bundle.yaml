@@ -1,0 +1,17 @@
+title:
+  ru: Значения параметров при создании
+  en_us: Значения параметров при создании
+
+tooltip:
+  ru: >- 
+    Please Write Description
+  en_us: >- 
+    Please Write Description
+
+assembly: RevitParamValuesByEvents.dll
+command_class: RevitParamValuesByEventsCommand
+
+author: DivinN
+
+min_revit_version: 2022
+max_revit_version: 2024
