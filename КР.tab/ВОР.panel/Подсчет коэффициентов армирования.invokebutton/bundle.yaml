@@ -1,0 +1,16 @@
+title:
+  ru: Подсчет коэффициентов армирования
+  en_us: Reinforcement coefficient calculation
+
+tooltip:
+  ru: Плагин для автоматического подсчета коэффициентов армирования по типам конструкций.
+  en_us: Plugin for automatic calculation of reinforcement coefficients by type of structure.
+
+assembly: RevitReinforcementCoefficient.dll
+command_class: RevitReinforcementCoefficientCommand
+
+author: DivinN
+help_url: "https://wiki.a101.ru/pages/viewpage.action?pageId=17473821"
+
+min_revit_version: 2020
+max_revit_version: 2024
