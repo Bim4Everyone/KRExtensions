@@ -1,0 +1,26 @@
+title:
+  ru:   "Коэффициенты\nармирования РД"
+  en_us:  "Reinforcement\ncoefficients WD"
+
+tooltip:
+  ru: >-
+    Плагин подсчитывает коэффициенты армирования по выбранным типам конструкций.
+    
+    
+    1. Откройте вид, на котором видны опалубочные элементы и арматура, по которым необходимо расчитать  коэффициенты армирования.
+    
+    2. В открывшемся окне выберите типы конструкций, для которых необходимо произвести расчет и нажмите "Рассчитать".
+    
+    3. Если необходимо подсчитать коэффициент усредненно на несколько типов конструкций, то поставьте соответствующую галку.
+    
+    4. Для записи значений выберите нужные типы конструкций и нажмите "Записать".
+  en_us: Plugin for automatic calculation of reinforcement coefficients by type of structure.
+
+assembly: RevitReinforcementCoefficient.dll
+command_class: RevitReinforcementCoefficientCommand
+
+author: DivinN
+help_url: "https://wiki.a101.ru/pages/viewpage.action?pageId=17473821"
+
+min_revit_version: 2020
+max_revit_version: 2024
