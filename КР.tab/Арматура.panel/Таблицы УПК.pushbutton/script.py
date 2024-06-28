@@ -68,6 +68,7 @@ class RevitRepository:
 
         self.categories = []
         self.type_key_word = []
+        self.concrete_group = []
         self.quality_indexes = []
 
         self.__rebar = self.__get_all_rebar()
@@ -80,6 +81,7 @@ class RevitRepository:
     def set_table_type(self, table_type):
         self.categories = table_type.categories
         self.type_key_word = table_type.type_key_word
+        self.concrete_group = table_type.concrete_group
         self.quality_indexes = table_type.indexes_info
 
         self.__get_concrete_by_table_type()
@@ -304,7 +306,8 @@ class RevitRepository:
     def __get_concrete_by_table_type(self):
         categories_id = [x.Id for x in self.categories]
         filtered_concrete = [x for x in self.__concrete if x.Category.Id in categories_id]
-        self.__concrete_by_table_type = self.__filter_by_type(filtered_concrete)
+        elems_filtered_by_type = self.__filter_by_type(filtered_concrete)
+        self.__concrete_by_table_type = self.__filter_by_group(elems_filtered_by_type)
 
     def get_filtered_concrete_by_user(self, buildings, constr_sections):
         buildings = [x.text_value for x in buildings]
@@ -353,6 +356,12 @@ class RevitRepository:
             for word in self.type_key_word:
                 if word in element.Name:
                     filtered_list.append(element)
+        return filtered_list
+
+    def __filter_by_group(self, elements):
+        filtered_list = []
+        for word in self.concrete_group:
+            filtered_list.extend(self.__filter_by_param(elements, CONSTR_GROUP, word))
         return filtered_list
 
     def __add_error(self, error_text, element, parameter_name):
@@ -432,6 +441,7 @@ class TableType:
     def __init__(self, name):
         self.__name = name
         self.__type_key_word = ""
+        self.__concrete_group = ""
         self.__categories = []
         self.__indexes_info = []
 
@@ -450,6 +460,14 @@ class TableType:
     @type_key_word.setter
     def type_key_word(self, value):
         self.__type_key_word = value
+
+    @reactive
+    def concrete_group(self):
+        return self.__concrete_group
+
+    @concrete_group.setter
+    def concrete_group(self, value):
+        self.__concrete_group = value
 
     @reactive
     def categories(self):
@@ -735,7 +753,7 @@ class Construction:
             self.__quality_indexes[
                 "Коэффициент суммарной площади сечений пилонов от площади перекрытия, ΣAw/Ap х 100"] = 0
 
-        if self.table_type.name == "Стены":
+        if "Стены" in self.table_type.name:
             elements_sizes = self.__find_elements_width(self.concrete)
             self.__quality_indexes["Толщина стен, мм"] = ", ".join(elements_sizes)
 
@@ -1105,40 +1123,60 @@ def script_execute(plugin_logger):
     floor_cat = Category.GetCategory(doc, BuiltInCategory.OST_Floors)
     framing_cat = Category.GetCategory(doc, BuiltInCategory.OST_StructuralFraming)
 
-    walls_table_type = TableType("Стены")
-    walls_table_type.categories = [walls_cat]
-    walls_table_type.type_key_word = ["Стена"]
-    walls_table_type.indexes_info = [
+    internal_walls_table_type = TableType("Стены внутренние")
+    internal_walls_table_type.categories = [walls_cat]
+    internal_walls_table_type.type_key_word = ["Стена"]
+    internal_walls_table_type.concrete_group = ["Стены_Вну"]
+    internal_walls_table_type.indexes_info = [
         QualityIndex("Этажность здания, тип секции", "1"),
         QualityIndex("Толщина стен, мм", "2"),
         QualityIndex("Класс бетона", "3"),
         QualityIndex("Объем бетона, м3", "4"),
-        QualityIndex("Масса вертикальной арматуры, кг", "5.1", "mass", ["Стена_Вертикальная"]),
-        QualityIndex("Расход вертикальной арматуры, кг/м3", "5.2", "consumption", ["Стена_Вертикальная"]),
-        QualityIndex("Масса горизонтальной арматуры, кг", "6.1", "mass", ["Стена_Горизонтальная"]),
-        QualityIndex("Расход горизонтальной арматуры, кг/м3", "6.2", "consumption", ["Стена_Горизонтальная"]),
-        QualityIndex("Масса конструктивной арматуры, кг", "7.1", "mass", ["Стена_Конструктивная"]),
-        QualityIndex("Расход конструктивной арматуры, кг/м3", "7.2", "consumption", ["Стена_Конструктивная"]),
+        QualityIndex("Масса вертикальной арматуры, кг", "5.1", "mass", ["Стена_Вертикальная", "Стены_Вну_Вертикальная"]),
+        QualityIndex("Расход вертикальной арматуры, кг/м3", "5.2", "consumption", ["Стена_Вертикальная", "Стены_Вну_Вертикальная"]),
+        QualityIndex("Масса горизонтальной арматуры, кг", "6.1", "mass", ["Стена_Горизонтальная", "Стены_Вну_Горизонтальная"]),
+        QualityIndex("Расход горизонтальной арматуры, кг/м3", "6.2", "consumption", ["Стена_Горизонтальная", "Стены_Вну_Горизонтальная"]),
+        QualityIndex("Масса конструктивной арматуры, кг", "7.1", "mass", ["Стена_Конструктивная", "Стены_Вну_Конструктивная"]),
+        QualityIndex("Расход конструктивной арматуры, кг/м3", "7.2", "consumption", ["Стена_Конструктивная", "Стены_Вну_Конструктивная"]),
+        QualityIndex("Общий расход, кг/м3", "8")]
+
+    external_walls_table_type = TableType("Стены наружные")
+    external_walls_table_type.categories = [walls_cat]
+    external_walls_table_type.type_key_word = ["Стена"]
+    external_walls_table_type.concrete_group = ["Стены_Нар"]
+    external_walls_table_type.indexes_info = [
+        QualityIndex("Этажность здания, тип секции", "1"),
+        QualityIndex("Толщина стен, мм", "2"),
+        QualityIndex("Класс бетона", "3"),
+        QualityIndex("Объем бетона, м3", "4"),
+        QualityIndex("Масса вертикальной арматуры, кг", "5.1", "mass", ["Стена_Вертикальная", "Стены_Нар_Вертикальная"]),
+        QualityIndex("Расход вертикальной арматуры, кг/м3", "5.2", "consumption", ["Стена_Вертикальная", "Стены_Нар_Вертикальная"]),
+        QualityIndex("Масса горизонтальной арматуры, кг", "6.1", "mass", ["Стена_Горизонтальная", "Стены_Нар_Горизонтальная"]),
+        QualityIndex("Расход горизонтальной арматуры, кг/м3", "6.2", "consumption", ["Стена_Горизонтальная", "Стены_Нар_Горизонтальная"]),
+        QualityIndex("Масса конструктивной арматуры, кг", "7.1", "mass", ["Стена_Конструктивная", "Стены_Нар_Конструктивная"]),
+        QualityIndex("Расход конструктивной арматуры, кг/м3", "7.2", "consumption", ["Стена_Конструктивная", "Стены_Нар_Конструктивная"]),
         QualityIndex("Общий расход, кг/м3", "8")]
 
     columns_table_type = TableType("Пилоны")
     columns_table_type.categories = [walls_cat, columns_cat]
     columns_table_type.type_key_word = ["Пилон"]
+    columns_table_type.concrete_group = ["Пилоны"]
     columns_table_type.indexes_info = [
         QualityIndex("Этажность здания, тип секции", "1"),
         QualityIndex("Сечение пилонов, толщина х ширина, мм", "2"),
         QualityIndex("Класс бетона", "3"),
         QualityIndex("Объем бетона, м3", "4"),
         QualityIndex("Коэффициент суммарной площади сечений пилонов от площади перекрытия, ΣAw/Ap х 100", "5"),
-        QualityIndex("Масса продольной арматуры, кг", "6.1", "mass", ["Пилон_Продольная"]),
-        QualityIndex("Расход продольной арматуры, кг/м3", "6.2", "consumption", ["Пилон_Продольная"]),
-        QualityIndex("Масса поперечной арматуры, кг", "7.1", "mass", ["Пилон_Поперечная"]),
-        QualityIndex("Расход поперечной арматуры, кг/м3", "7.2", "consumption", ["Пилон_Поперечная"]),
+        QualityIndex("Масса продольной арматуры, кг", "6.1", "mass", ["Пилон_Продольная", "Пилоны_Продольная"]),
+        QualityIndex("Расход продольной арматуры, кг/м3", "6.2", "consumption", ["Пилон_Продольная", "Пилоны_Продольная"]),
+        QualityIndex("Масса поперечной арматуры, кг", "7.1", "mass", ["Пилон_Поперечная", "Пилоны_Поперечная"]),
+        QualityIndex("Расход поперечной арматуры, кг/м3", "7.2", "consumption", ["Пилон_Поперечная", "Пилоны_Поперечная"]),
         QualityIndex("Общий расход, кг/м3", "8")]
 
     foundation_table_type = TableType("Фундаментная плита")
     foundation_table_type.categories = [floor_cat, foundation_cat, walls_cat]
     foundation_table_type.type_key_word = ["ФПлита"]
+    foundation_table_type.concrete_group = ["ФП"]
     foundation_table_type.indexes_info = [
         QualityIndex("Этажность здания, тип секции", "1"),
         QualityIndex("Толщина плиты, мм", "2"),
@@ -1165,6 +1203,7 @@ def script_execute(plugin_logger):
     floor_table_type = TableType("Плита перекрытия")
     floor_table_type.categories = [floor_cat, framing_cat, walls_cat]
     floor_table_type.type_key_word = ["Перекрытие", "Балка"]
+    floor_table_type.concrete_group = ["ПП"]
     floor_table_type.indexes_info = [
         QualityIndex("Этажность здания, тип секции", "1"),
         QualityIndex("Толщина плиты, мм", "2"),
@@ -1186,7 +1225,8 @@ def script_execute(plugin_logger):
         QualityIndex("Расход арматуры балок, кг/м3", "9.2", "consumption", ["ПП_Балки"]),
         QualityIndex("Общий расход, кг/м3", "10")]
 
-    table_types.append(walls_table_type)
+    table_types.append(internal_walls_table_type)
+    table_types.append(external_walls_table_type)
     table_types.append(columns_table_type)
     table_types.append(foundation_table_type)
     table_types.append(floor_table_type)
