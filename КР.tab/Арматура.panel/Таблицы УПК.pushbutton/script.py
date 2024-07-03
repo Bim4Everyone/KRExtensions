@@ -163,7 +163,7 @@ class RevitRepository:
                 elif element_type.IsExistsParam(FORM_NUMBER):
                     number_value = element_type.GetParamValue(FORM_NUMBER)
 
-                if number_value >= 200:
+                if number_value >= 2000:
                     if not element.IsExistsParam(parameter_name) and not element_type.IsExistsParam(parameter_name):
                         self.__add_error("Арматура___Отсутствует параметр у экземпляра или типоразмера___", element, parameter_name)
 
@@ -219,7 +219,7 @@ class RevitRepository:
                 else:
                     form_number = element_type.GetParamValueOrDefault(FORM_NUMBER)
 
-                if form_number < 200:
+                if 1000 <= form_number < 2000:
                     if element.IsExistsParam(parameter_name):
                         if not element.GetParam(parameter_name).HasValue or element.GetParamValue(parameter_name) == None:
                             self.__add_error("Арматура___Отсутствует значение у параметра (экземпляра или типа)___",
@@ -235,7 +235,7 @@ class RevitRepository:
                 elif element_type.IsExistsParam(FORM_NUMBER):
                     number_value = element_type.GetParamValue(FORM_NUMBER)
 
-                if number_value >= 200:
+                if number_value >= 2000:
                     if element.IsExistsParam(parameter_name):
                         if not element.GetParam(parameter_name).HasValue or element.GetParamValue(parameter_name) == None:
                             self.__add_error("Арматура___Отсутствует значение у параметра (экземпляра или типа)___", element, parameter_name)
@@ -279,7 +279,7 @@ class RevitRepository:
 
         self.__rebar = self.__filter_by_param(self.__rebar, FILTRATION_1, filter_value, False)
         self.__rebar = self.__filter_by_param(self.__rebar, FILTRATION_2, filter_value, False)
-        self.__rebar = self.__filter_by_param(self.__rebar, FORM_NUMBER, 1000, False)
+        self.__rebar = self.__filter_by_param(self.__rebar, FORM_NUMBER, 10000, False)
 
         self.__concrete = self.__filter_by_param(self.__concrete, FILTRATION_1, filter_value, False)
         self.__concrete = self.__filter_by_param(self.__concrete, FILTRATION_2, filter_value, False)
@@ -645,7 +645,7 @@ class Construction:
             else:
                 form_number = element_type.GetParamValue(FORM_NUMBER)
 
-            if form_number < 200:
+            if 1000 <= form_number < 2000:
                 if diameter in self.__diameter_dict.keys():
                     mass_per_metr = self.__diameter_dict[diameter]
                 else:
