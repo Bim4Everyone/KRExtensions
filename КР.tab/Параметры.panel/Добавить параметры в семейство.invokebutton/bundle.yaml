@@ -10,7 +10,7 @@ assembly: RevitFamilyParameterAdder.dll
 command_class: RevitFamilyParameterAdderCommand
 
 author: DivinN
-help_url: "https://wiki.a101.ru/pages/viewpage.action?pageId=9211181"
+help_url: "https://kb.a101.ru/pages/viewpage.action?pageId=104596869"
 
 min_revit_version: 2020
 max_revit_version: 2024
