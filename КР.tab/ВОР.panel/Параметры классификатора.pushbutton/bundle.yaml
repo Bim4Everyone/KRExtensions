@@ -1,0 +1,13 @@
+title:
+  ru: Параметры классификатора
+  en_us: Classifier parameters
+
+tooltip:
+  ru: Заполняет параметры классификатора на уровне материалов по коду работы
+  en_us: Fills in the classifier parameters at the material level by job code
+
+author: DivinN
+help_url: "https://kb.a101.ru/pages/viewpage.action?pageId=82626984"
+
+min_revit_version: 2022
+max_revit_version: 2024
