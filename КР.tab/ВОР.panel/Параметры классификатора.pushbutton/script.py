@@ -29,18 +29,18 @@ doc = __revit__.ActiveUIDocument.Document
 uidoc = __revit__.ActiveUIDocument
 app = doc.Application
 
-CHAPTER_PARAMETER = "ФОП_МТР_Наименование главы"
-WORK_TITLE_PARAMETER = "ФОП_МТР_Наименование работы"
-UNIT_PARAMETER = "ФОП_МТР_Единица измерения"
-CALCULATION_TYPE_PARAMETER = "ФОП_МТР_Тип подсчета"
+chapter_parameter = "ФОП_МТР_Наименование главы"
+work_title_parameter = "ФОП_МТР_Наименование работы"
+unit_parameter = "ФОП_МТР_Единица измерения"
+calculation_type_parameter = "ФОП_МТР_Тип подсчета"
 
-CALCULATION_TYPE_DICT = {
+calculation_type_dict = {
     "м": 1,
     "м²": 2,
     "м³": 3,
     "шт.": 4}
 
-DEFAULT_EXCEL_PATH = "W:\Проектный институт\Проектные Группы\Типовые ТЗ\BIM-стандарт A101\Классификатор видов работ.xlsx"
+default_excel_path = "W:\Проектный институт\Проектные Группы\Типовые ТЗ\BIM-стандарт A101\Классификатор видов работ.xlsx"
 
 report_no_work_code = []
 report_classifier_code_not_found = []
@@ -106,8 +106,8 @@ def read_from_excel(path):
 
 
 def get_calculation_type_value(unit_value):
-    if CALCULATION_TYPE_DICT.has_key(unit_value):
-        return CALCULATION_TYPE_DICT[unit_value]
+    if calculation_type_dict.has_key(unit_value):
+        return calculation_type_dict[unit_value]
     else:
         return "Ошибка"
 
@@ -130,23 +130,23 @@ def set_classifier_parameters(revit_materials):
                 work = revit_material.work
 
                 edited = set_param(
-                    material.GetParam(CHAPTER_PARAMETER),
+                    material.GetParam(chapter_parameter),
                     work.chapter,
                     edited)
 
                 edited = set_param(
-                    material.GetParam(WORK_TITLE_PARAMETER),
+                    material.GetParam(work_title_parameter),
                     work.title_of_work,
                     edited)
 
                 edited = set_param(
-                    material.GetParam(UNIT_PARAMETER),
+                    material.GetParam(unit_parameter),
                     work.unit_of_measurement,
                     edited)
 
                 calculation_type = get_calculation_type_value(work.unit_of_measurement)
                 edited = set_param(
-                    material.GetParam(CALCULATION_TYPE_PARAMETER),
+                    material.GetParam(calculation_type_parameter),
                     calculation_type,
                     edited)
 
@@ -159,7 +159,7 @@ def set_classifier_parameters(revit_materials):
 
 
 def get_excel_path():
-    excel_path = DEFAULT_EXCEL_PATH
+    excel_path = default_excel_path
     if not os.path.exists(excel_path):
         excel_path = pick_file(
             files_filter="excel files (*.xlsx)|*.xlsx",
