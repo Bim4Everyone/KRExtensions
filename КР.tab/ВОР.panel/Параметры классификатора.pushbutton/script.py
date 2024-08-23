@@ -1,4 +1,5 @@
 # -*- coding: utf-8 -*-
+import os
 import Autodesk.Revit.DB
 import clr
 import datetime
@@ -43,6 +44,8 @@ CALCULATION_TYPE_DICT = {
     "м²": 2,
     "м³": 3,
     "шт.": 4}
+
+DEFAULT_EXCEL_PATH = "W:\аПроектный институт\Проектные Группы\Типовые ТЗ\BIM-стандарт A101\Классификатор видов работ.xlsx"
 
 report_no_work_code = []
 report_classifier_code_not_found = []
@@ -161,26 +164,60 @@ def set_classifier_parameters(revit_materials):
             report_errors.append(["ОШИБКА ПРИ ЗАПИСИ", revit_material.keynote, material.Name])
 
 
+def get_excel_path():
+    excel_path = DEFAULT_EXCEL_PATH
+    if not os.path.exists(excel_path):
+        excel_path = pick_file(
+            files_filter="excel files (*.xlsx)|*.xlsx",
+            init_dir="c:\\",
+            restore_dir=True,
+            multi_file=False,
+            unc_paths=False)
+
+    if not excel_path:
+        output = script.output.get_output()
+        output.close()
+        alert("Не указан путь к Excel-файлу Классификатора", exitscript=True)
+    return excel_path
+
+
+def get_materials():
+    elems = (FilteredElementCollector(doc, doc.ActiveView.Id)
+             .WhereElementIsNotElementType()
+             .ToElements())
+
+    materialIds = []
+    for elem in elems:
+        for materialId in elem.GetMaterialIds(False):
+            if materialId not in materialIds:
+                materialIds.append(materialId)
+
+    materials = []
+    for materialId in materialIds:
+        material = doc.GetElement(materialId)
+        materials.append(material)
+
+    return materials
+
+
 @notification()
 @log_plugin(EXEC_PARAMS.command_name)
 def script_execute(plugin_logger):
-    excel_path = pick_file()
-    if excel_path:
-        TaskDialog.Show("Example Title", excel_path)
+    print("Здравствуйте! Данный плагин предназначен для записи в параметры материалов "
+          + "информации из Классификатора видов работ.")
 
-    # Добавить проверку на корректность пути
-    # alert("Не указан путь к ФОП или файлу Excel", exitscript=True)
+    excel_path = get_excel_path()
+    print("Читаю excel-файл Классификатора видов работ по пути: " + excel_path)
+
     dict_from_excel = read_from_excel(excel_path)
+    print("Найдено видов работ: " + str(len(dict_from_excel.keys())))
 
-    materials = (FilteredElementCollector(doc)
-                 .OfCategory(BuiltInCategory.OST_Materials)
-                 .ToElements())
+    print("Собираю материалы у элементы на активном виде...")
+    materials = get_materials()
     print("Найдено материалов: " + str(len(materials)))
 
     revit_materials = []
-
     for material in materials:
-
         keynote = material.GetParam(BuiltInParameter.KEYNOTE_PARAM).AsString()
 
         # Отсеиваем ситуации, когда у материала не указана Ключевая заметка (код работы)
@@ -207,6 +244,5 @@ def script_execute(plugin_logger):
                        title="Отчет работы плагина",
                        columns=["Статус⠀⠀⠀⠀⠀⠀⠀⠀", "Код работы", "Имя материала"],
                        formats=['', '', ''])
-
 
 script_execute()
