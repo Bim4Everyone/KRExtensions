@@ -1,34 +1,29 @@
 # -*- coding: utf-8 -*-
 import os
-import Autodesk.Revit.DB
 import clr
 import datetime
-
 from System.Collections.Generic import *
+
+clr.AddReference("Microsoft.Office.Interop.Excel")
+import Microsoft.Office.Interop.Excel as Excel
+from System.Runtime.InteropServices import Marshal
 
 clr.AddReference("dosymep.Revit.dll")
 clr.AddReference("dosymep.Bim4Everyone.dll")
+import dosymep
 
-from System.Windows.Input import ICommand
+clr.ImportExtensions(dosymep.Revit)
+clr.ImportExtensions(dosymep.Bim4Everyone)
+from dosymep_libs.bim4everyone import *
 
 import pyevent
 from pyrevit import EXEC_PARAMS, revit
 from pyrevit.forms import *
 from pyrevit import script
 
+import Autodesk.Revit.DB
 from Autodesk.Revit.DB import *
 from Autodesk.Revit.UI.Selection import *
-
-import dosymep
-
-clr.ImportExtensions(dosymep.Revit)
-clr.ImportExtensions(dosymep.Bim4Everyone)
-
-from dosymep_libs.bim4everyone import *
-
-clr.AddReference("Microsoft.Office.Interop.Excel")
-import Microsoft.Office.Interop.Excel as Excel
-from System.Runtime.InteropServices import Marshal
 
 doc = __revit__.ActiveUIDocument.Document
 uidoc = __revit__.ActiveUIDocument
@@ -45,7 +40,7 @@ CALCULATION_TYPE_DICT = {
     "м³": 3,
     "шт.": 4}
 
-DEFAULT_EXCEL_PATH = "W:\аПроектный институт\Проектные Группы\Типовые ТЗ\BIM-стандарт A101\Классификатор видов работ.xlsx"
+DEFAULT_EXCEL_PATH = "W:\Проектный институт\Проектные Группы\Типовые ТЗ\BIM-стандарт A101\Классификатор видов работ.xlsx"
 
 report_no_work_code = []
 report_classifier_code_not_found = []
@@ -75,7 +70,6 @@ def read_from_excel(path):
     excel = Excel.ApplicationClass()
     excel.Visible = False
     excel.DisplayAlerts = False
-
     try:
         workbook = excel.Workbooks.Open(path)
         ws_1 = workbook.Worksheets(1)
@@ -83,14 +77,11 @@ def read_from_excel(path):
                                     System.Reflection.Missing.Value, System.Reflection.Missing.Value,
                                     Excel.XlSearchOrder.xlByRows, Excel.XlSearchDirection.xlPrevious,
                                     False, System.Reflection.Missing.Value, System.Reflection.Missing.Value).Row
-
-        d = {}
-
+        dict_for_data = {}
         code = ""
         chapter = ""
         title_of_work = ""
         unit_of_measurement = ""
-
         for i in range(2, row_end_1 + 1):
             unit_of_measurement = ws_1.Cells(i, 3).Text
 
@@ -101,14 +92,17 @@ def read_from_excel(path):
                 code = ws_1.Cells(i, 1).Text
                 title_of_work = ws_1.Cells(i, 2).Text
                 work = Work(code, chapter, title_of_work, unit_of_measurement)
-                d[code] = work
-
+                dict_for_data[code] = work
+    except:
+        output = script.output.get_output()
+        output.close()
+        alert("При чтении Excel-файла Классификатора произошла ошибка", exitscript=True)
     finally:
         excel.ActiveWorkbook.Close(False)
         Marshal.ReleaseComObject(ws_1)
         Marshal.ReleaseComObject(workbook)
         Marshal.ReleaseComObject(excel)
-    return d
+    return dict_for_data
 
 
 def get_calculation_type_value(unit_value):
@@ -186,6 +180,11 @@ def get_materials():
              .WhereElementIsNotElementType()
              .ToElements())
 
+    if len(elems) == 0:
+        output = script.output.get_output()
+        output.close()
+        alert("На активном виде не найдено ни одного элемента", exitscript=True)
+
     materialIds = []
     for elem in elems:
         for materialId in elem.GetMaterialIds(False):
@@ -197,6 +196,11 @@ def get_materials():
         material = doc.GetElement(materialId)
         materials.append(material)
 
+    if len(materials) == 0:
+        output = script.output.get_output()
+        output.close()
+        alert("На активном виде не найдено ни одного элемента, " +
+              "у которого можно забрать материал", exitscript=True)
     return materials
 
 
@@ -206,15 +210,15 @@ def script_execute(plugin_logger):
     print("Здравствуйте! Данный плагин предназначен для записи в параметры материалов "
           + "информации из Классификатора видов работ.")
 
+    print("Собираю материалы у элементы на активном виде...")
+    materials = get_materials()
+    print("Найдено материалов: " + str(len(materials)))
+
     excel_path = get_excel_path()
     print("Читаю excel-файл Классификатора видов работ по пути: " + excel_path)
 
     dict_from_excel = read_from_excel(excel_path)
     print("Найдено видов работ: " + str(len(dict_from_excel.keys())))
-
-    print("Собираю материалы у элементы на активном виде...")
-    materials = get_materials()
-    print("Найдено материалов: " + str(len(materials)))
 
     revit_materials = []
     for material in materials:
@@ -244,5 +248,6 @@ def script_execute(plugin_logger):
                        title="Отчет работы плагина",
                        columns=["Статус⠀⠀⠀⠀⠀⠀⠀⠀", "Код работы", "Имя материала"],
                        formats=['', '', ''])
+
 
 script_execute()
