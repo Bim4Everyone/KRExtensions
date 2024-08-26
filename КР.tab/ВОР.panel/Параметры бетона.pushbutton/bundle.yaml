@@ -1,0 +1,30 @@
+title:
+  ru: Параметры бетона
+  en_us: Concrete parameters
+
+tooltip:
+  ru: >-
+    Заполняет параметры, которые характеризуют бетон 
+    (обр_ФОП_Марка бетона B, обр_ФОП_Марка бетона F, 
+    обр_ФОП_Марка бетона W, ФОП_ТИП_Тип материала).
+    
+    Отбирает элементы из тех, которые видны на текущем виде.
+
+    Плагин запускать на 3D-виде.
+
+  en_us: >-
+    Fills in the parameters that characterize concrete 
+    (obr_FOP_Concrete grade B, obr_FOP_Concrete grade F, 
+    obr_FOP_Concrete grade W, FOP_TYPE_Material type).
+    
+    Selects elements from those that are visible in the current view.
+    
+    Run the plugin in a 3D view.
+
+author: DivinN
+help_url: "https://kb.a101.ru/pages/viewpage.action?pageId=82626984"
+
+context: active-3d-view
+
+min_revit_version: 2022
+max_revit_version: 2024
