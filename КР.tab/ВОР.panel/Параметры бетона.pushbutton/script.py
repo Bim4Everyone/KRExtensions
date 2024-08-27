@@ -47,13 +47,16 @@ class ReportItem:
         self.count_of_insts = count_of_insts  # кол-во экземпляров типоразмера из Revit
 
 
-# Класс для хранения информации по типу Revit
+# Класс для хранения информации по типоразмеру из Revit
 class RevitElementType:
     def __init__(self, elem_type_name, elems_list):
         self.elem_type_name = elem_type_name  # имя типоразмера из Revit
         self.elems_list = elems_list  # экземпляры типоразмера из Revit
+
         type_id = elems_list[0].GetTypeId()
         self.elem_type = doc.GetElement(type_id)  # типоразмер из Revit
+
+        # Задаем значения по умолчанию
         self.value_b = 0.0  # значение для "обр_ФОП_Марка бетона B"
         self.value_f = 0.0  # значение для "обр_ФОП_Марка бетона F"
         self.value_w = 0.0  # значение для "обр_ФОП_Марка бетона W"
@@ -69,7 +72,6 @@ class RevitElementType:
         value_b = "0"
         value_f = "0"
         value_w = "0"
-
         if "B" in self.elem_type_name:
             try:
                 search_b = re.findall(pat_B + base_pattern, self.elem_type_name)[0]  # B30
@@ -149,13 +151,14 @@ def get_elements():
 def filter_elements(elems):
     temp = []
     errors = []
-    # При выборке нельзя использовать фильтрацию по категориям, поэтому в elems много
+    # При выборке нельзя использовать фильтрацию по категориям (по ТЗ), поэтому в elems много
     # элементов не нужных типов, отсеиваем их поиском параметра на экземпляре + по имени
     for elem in elems:
         try:
             if "(ЖБ" not in elem.Name and "(Б" not in elem.Name:
                 continue
             elem.GetParam(material_type_param_name)
+            # Отбираем элементы, которые прошли фильтрацию
             temp.append(elem)
         except:
             errors.append(elem)
@@ -171,23 +174,27 @@ def sort_elements(elems):
     elems_dict = {}
     for elem in elems:
         name = elem.Name
+        # Распределяем элементы группируя по имени типа
         if elems_dict.has_key(name):
             elems_dict[name].append(elem)
         else:
             elems_dict[name] = [elem]
+    # Теперь ключи - имена типов, значения - списки экзепляров элементов
 
     revit_elem_types = []
     for key in elems_dict.keys():
         revit_elem_types.append(RevitElementType(key, elems_dict[key]))
-
     return revit_elem_types
 
 
+# Проводим анализ каждого типа: забираем из имени значения B,W,F, заполняем поля класса-оболочки
 def analyze_element_types(elem_types):
     for elem_type in elem_types:
         elem_type.analyze_element_type_name()
 
 
+# Записываем значения в параметры бетона на типе и в Тип материала на экземпляре
+# на основе информации из имени типа
 def write_values(elem_types):
     report = []
     for elem_type in elem_types:
@@ -195,7 +202,7 @@ def write_values(elem_types):
         report.append(report_part)
     return report
 
-
+# Преобразуем данные в вид, подходящий для таблиц pyRevit
 def get_report(type_report_list):
     report = []
     for type_report in type_report_list:
@@ -208,27 +215,6 @@ def get_report(type_report_list):
         report_item[5] = type_report.count_of_insts
 
         report.append(report_item)
-
-    """
-    output = script.output.get_output()
-    for type_report in type_report_list:
-        report_part = []
-        for inst_report in type_report.inst_report_items:
-            report_item = ["", "", "", "", "", ""]
-            report_item[4] = output.linkify(inst_report.inst_id)
-            report_item[5] = inst_report.material_type_value
-
-            report_part.append(report_item)
-
-        first_report_part = report_part[0]
-        first_report_part[0] = type_report.type_name
-        first_report_part[1] = str(type_report.value_b)
-        first_report_part[2] = str(type_report.value_f)
-        first_report_part[3] = str(type_report.value_w)
-
-        report = report + report_part
-        
-    """
     return report
 
 
