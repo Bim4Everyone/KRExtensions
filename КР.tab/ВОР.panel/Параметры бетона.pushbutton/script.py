@@ -4,6 +4,7 @@ import clr
 import datetime
 from System.Collections.Generic import *
 import re
+import inspect
 
 clr.AddReference("Microsoft.Office.Interop.Excel")
 import Microsoft.Office.Interop.Excel as Excel
@@ -34,6 +35,21 @@ mark_B_param_name = "обр_ФОП_Марка бетона B"
 mark_F_param_name = "обр_ФОП_Марка бетона F"
 mark_W_param_name = "обр_ФОП_Марка бетона W"
 material_type_param_name = "ФОП_ТИП_Тип материала"
+
+
+class ReportItemForType:
+    def __init__(self, type_name, value_b, value_f, value_w, inst_report_items):
+        self.type_name = type_name  # имя типоразмера из Revit
+        self.value_b = value_b  # значение марки бетона B
+        self.value_f = value_f  # значение марки бетона F
+        self.value_w = value_w  # значение марки бетона W
+        self.inst_report_items = inst_report_items  # отчеты по экземплярам типоразмера из Revit
+
+
+class ReportItemForInst:
+    def __init__(self, inst_id, material_type_value):
+        self.inst_id = inst_id  # id экземпляра
+        self.material_type_value = material_type_value  # значение "ФОП_ТИП_Тип материала"
 
 
 # Класс для хранения информации по типу Revit
@@ -85,15 +101,49 @@ class RevitElementType:
             except:
                 self.has_errors = True
 
-    def write_values(self):
+    def write_values_in_type(self, report_for_insts):
+        self.elem_type.GetParam(mark_B_param_name).Set(self.value_b)
+        self.elem_type.GetParam(mark_F_param_name).Set(self.value_f)
+        self.elem_type.GetParam(mark_W_param_name).Set(self.value_w)
+        """
         try:
-            print(self.elem_type)
             self.elem_type.GetParam(mark_B_param_name).Set(self.value_b)
             self.elem_type.GetParam(mark_F_param_name).Set(self.value_f)
             self.elem_type.GetParam(mark_W_param_name).Set(self.value_w)
+
+            return ReportItemForType(
+                self.elem_type_name,
+                str(self.value_b),
+                str(self.value_f),
+                str(self.value_w),
+                report_for_insts
+            )
         except:
             self.has_errors = True
+            return ReportItemForType(
+                self.elem_type_name,
+                "Ошибка",
+                "Ошибка",
+                "Ошибка",
+                [])
+"""
+    def write_values_in_instance(self):
+        report_for_insts = []
+        try:
+            for elem in self.elems_list:
+                value = "B" + self.get_simple_str_value(self.value_b)
+                elem.GetParam(material_type_param_name).Set(value)
 
+                report_for_insts.append(ReportItemForInst(elem.Id, value))
+        except:
+            self.has_errors = True
+        return report_for_insts
+
+    def get_simple_str_value(self, value):
+        if value % 1 == 0:
+            return str(int(value))
+        else:
+            return str(value)
 
 def get_elements():
     elems = (FilteredElementCollector(doc, doc.ActiveView.Id)
@@ -109,11 +159,22 @@ def get_elements():
 
 def filter_elements(elems):
     temp = []
+    errors = []
+    # При выборке нельзя использовать фильтрацию по категориям, поэтому в elems много
+    # элементов не нужных типов, отсеиваем их поиском параметра на экземпляре + по имени
     for elem in elems:
-        if "(" not in elem.Name and ")" not in elem.Name:
-            continue
-        print(elem.Name)
-        temp.append(elem)
+        try:
+            if "(ЖБ" not in elem.Name and "(Б" not in elem.Name:
+                continue
+            elem.GetParam(material_type_param_name)
+            temp.append(elem)
+        except:
+            errors.append(elem)
+
+    if len(temp) == 0:
+        output = script.output.get_output()
+        output.close()
+        alert("На активном виде не найдено ни одного элемента", exitscript=True)
     return temp
 
 
@@ -139,9 +200,37 @@ def analyze_element_types(elem_types):
 
 
 def write_values(elem_types):
+    report = []
     for elem_type in elem_types:
-        elem_type.write_values()
+        report_for_insts = elem_type.write_values_in_instance()
 
+        #report_part = elem_type.write_values_in_type(report_for_insts)
+        elem_type.write_values_in_type(report_for_insts)
+
+        #report.append(report_part)
+    return report
+
+
+def get_report(type_report_list):
+    report = []
+    output = script.output.get_output()
+    for type_report in type_report_list:
+        report_part = []
+        for inst_report in type_report.inst_report_items:
+            report_item = ["", "", "", "", "", ""]
+            report_item[4] = output.linkify(inst_report.inst_id)
+            report_item[5] = inst_report.material_type_value
+
+            report_part.append(report_item)
+
+        first_report_part = report_part[0]
+        first_report_part[0] = type_report.type_name
+        first_report_part[1] = str(type_report.value_b)
+        first_report_part[2] = str(type_report.value_f)
+        first_report_part[3] = str(type_report.value_w)
+
+        report = report + report_part
+    return report
 
 @notification()
 @log_plugin(EXEC_PARAMS.command_name)
@@ -155,12 +244,31 @@ def script_execute(plugin_logger):
     print("Собираю элементы на активном виде...")
     elements = get_elements()
     elements = filter_elements(elements)
+    print("Найдено элементов для работы: " + str(len(elements)))
     revit_elem_types = sort_elements(elements)
-
+    print("Найдено типоразмеров: " + str(len(revit_elem_types)))
     analyze_element_types(revit_elem_types)
 
+
+
+    print("Выполняю запись...")
     with revit.Transaction("BIM: Заполнение параметров бетона"):
-        write_values(revit_elem_types)
+        type_report_list = write_values(revit_elem_types)
 
 
+    """
+    report = get_report(type_report_list)
+    output = script.output.get_output()
+    output.print_table(table_data=report,
+                       title="Отчет работы плагина",
+                       columns=[
+                           "Имя типоразмера",
+                           "Марка B",
+                           "Марка F",
+                           "Марка W",
+                           "ID экземпляра",
+                           "Тип материала"]
+                       )
+
+"""
 script_execute()
