@@ -255,6 +255,8 @@ def script_execute(plugin_logger):
     with revit.Transaction("BIM: Заполнение параметров бетона"):
         type_report_list = write_values(revit_elem_types)
 
+    # Сортируем список ReportItem по атрибуту, в котором лежит имя типоразмера
+    type_report_list = sorted(type_report_list, key=lambda report_item: report_item.type_name)
     report = get_report(type_report_list)
     '''
     # При печати таблицы встречается ошибка, когда таблица по неустановленной причине печаться не хочет
