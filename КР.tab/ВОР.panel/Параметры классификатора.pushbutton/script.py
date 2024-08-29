@@ -166,7 +166,8 @@ def get_excel_path():
             init_dir="c:\\",
             restore_dir=True,
             multi_file=False,
-            unc_paths=False)
+            unc_paths=False,
+            title="Выберите excel-файл Классификатора")
 
     if not excel_path:
         output = script.output.get_output()
@@ -203,6 +204,20 @@ def get_materials():
               "у которого можно забрать материал", exitscript=True)
     return materials
 
+def get_report():
+    report_part_1 = sorted(report_errors, key=lambda report_item: report_item[1])
+    report_part_2 = sorted(report_edited, key=lambda report_item: report_item[1])
+    report_part_3 = sorted(report_not_edited, key=lambda report_item: report_item[1])
+    report_part_4 = sorted(report_no_work_code, key=lambda report_item: report_item[1])
+    report_part_5 = sorted(report_classifier_code_not_found, key=lambda report_item: report_item[1])
+
+    report = (report_part_1
+              + report_part_2
+              + report_part_3
+              + report_part_4
+              + report_part_5)
+    return report
+
 
 @notification()
 @log_plugin(EXEC_PARAMS.command_name)
@@ -238,11 +253,7 @@ def script_execute(plugin_logger):
 
     set_classifier_parameters(revit_materials)
 
-    report = (report_errors
-              + report_edited
-              + report_not_edited
-              + report_no_work_code
-              + report_classifier_code_not_found)
+    report = get_report()
     output = script.output.get_output()
     output.print_table(table_data=report,
                        title="Отчет работы плагина",
