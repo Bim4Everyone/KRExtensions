@@ -64,18 +64,29 @@ class RevitElementType:
         self.has_errors = False  # метка, что при получении значений возникли ошибки
 
     def analyze_element_type_name(self):
-        pat_B = 'B'
+        pat_B = r'[BВ]'
         pat_F = 'F'
         pat_W = 'W'
-        base_pattern = '[0-9,.]*'
+        base_pattern = r'[0-9,.]*'
 
         value_b = "0"
         value_f = "0"
         value_w = "0"
-        if "B" in self.elem_type_name:
+
+        # Полное имя "ВН_Перекрытие-200 (ЖБ В25 F150 W4)"
+        # Отбираем "(ЖБ В25 F150 W4)"
+        material_part_of_name = re.findall('\(.*\)', self.elem_type_name)
+        if not material_part_of_name:
+            self.has_errors = True
+            return
+
+        material_part_of_name = material_part_of_name[0]
+
+        # Букву "B" можно написать на русском и на английском
+        if re.findall('[BВ]', material_part_of_name):
             try:
-                search_b = re.findall(pat_B + base_pattern, self.elem_type_name)[0]  # B30
-                value_b = re.findall(base_pattern, search_b)[1]  # 30 или 7,5
+                search_b = re.findall(pat_B + base_pattern, material_part_of_name)[0]  # B30
+                value_b = re.findall(base_pattern, search_b)[1]  # 30 из ['', '30', '']
                 value_b = value_b.replace(",", ".")  # 30 или 7.5
                 self.material_type = "B" + value_b  # B30 или B7.5
 
@@ -155,7 +166,7 @@ def filter_elements(elems):
     # элементов не нужных типов, отсеиваем их поиском параметра на экземпляре + по имени
     for elem in elems:
         try:
-            if "(ЖБ" not in elem.Name and "(Б" not in elem.Name:
+            if not re.findall("(\(ЖБ|\(Б)( B| В)", elem.Name):
                 continue
             elem.GetParam(material_type_param_name)
             # Отбираем элементы, которые прошли фильтрацию
@@ -202,6 +213,7 @@ def write_values(elem_types):
         report.append(report_part)
     return report
 
+
 # Преобразуем данные в вид, подходящий для таблиц pyRevit
 def get_report(type_report_list):
     report = []
@@ -226,6 +238,10 @@ def script_execute(plugin_logger):
     print("- обр_ФОП_Марка бетона F")
     print("- обр_ФОП_Марка бетона W")
     print("- ФОП_ТИП_Тип материала")
+
+    print("Будут отобраны элементы только с корректными наименованиями:")
+    print("- \"НН_Перекрытие-240 (ЖБ B30 F150 W6)\"")
+    print("- \"Ф_Подготовка-70 (Б B7.5)\"")
 
     print("Собираю элементы на активном виде...")
     elements = get_elements()
