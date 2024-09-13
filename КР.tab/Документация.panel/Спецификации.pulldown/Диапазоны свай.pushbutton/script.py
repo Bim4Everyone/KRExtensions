@@ -27,22 +27,59 @@ doc = __revit__.ActiveUIDocument.Document
 uidoc = __revit__.ActiveUIDocument
 app = doc.Application
 
-param_name_for_mark = "Марка"
-param_name_for_write = "ФОП_Примечание"
+output = script.output.get_output()
 
-# Список, который будет содержать id свай,у которых нет или не корректная марка
+param_name_for_mark = "Марка"
+"""Имя параметра, где плагин будет искать марку сваи, записанную пользователем"""
+
+param_name_for_write = "ФОП_Примечание"
+"""Имя параметра, в который плагин будет записывать диапазон марок свай (напр., "1-3, 5")"""
+
 pile_ids_without_mark = []
+"""Список, который будет содержать id свай, у которых нет или не корректная марка"""
+
+mark_separator = ", "
+"""Разделитель между марками, например, в '1, 2, 3, 4' разделитель - ', ' """
+
 
 class RevitPileType:
+    """Класс-оболочка для типоразмера элемента сваи."""
+
     def __init__(self, pile_type_name):
         self.pile_type_name = pile_type_name
+        """Имя типоразмера сваи"""
+
         self.piles = []
+        """Перечень свай этого типоразмера семейства"""
+
         self.marks = []
+        """
+        Перечень марок свай этого типоразмера списком.
+        Используется для получения диапазона свай.
+        Заполняется одновременно с добавлением сваи через add_pile().
+        """
+
         self.all_marks = ""
+        """
+        Перечень марок свай этого типоразмера в строку.
+        Используется для вывода в отчет.
+        Заполняется одновременно с добавлением сваи через add_pile().
+        Пример: "1, 2, 3, 5"...
+        """
+
         self.mark_range = ""
+        """
+        Диапазон марок свай этого типоразмера.
+        \nПример: "1-3, 5"
+        """
 
     def add_pile(self, pile):
-        self.piles.append(pile)
+        """ Добавляет:
+            - элемент сваи в список свай RevitPileType (piles);
+            - марку сваи из параметра "Марка" в список марок RevitPileType (marks);
+            - марку сваи в общий список марок свай (all_marks).
+        """
+
         mark_as_str = pile.GetParam(BuiltInParameter.ALL_MODEL_MARK).AsString()
         if not mark_as_str:
             pile_ids_without_mark.append(pile.Id)
@@ -54,37 +91,73 @@ class RevitPileType:
             pile_ids_without_mark.append(pile.Id)
             return
         self.add_mark(mark)
+        self.piles.append(pile)
 
     def add_mark(self, mark):
         self.marks.append(mark)
-        self.all_marks += '{}, '.format(mark)
+        self.all_marks += '{}{}'.format(mark, mark_separator)
 
     def get_range(self):
+        """
+        Получает значение диапазона марок свай и записывает в mark_range.
+        Напр., "1,2,3,4" -> "1-3,4"
+        """
         self.marks.sort()
         for r in self.get_ranges(self.marks):
             value_0 = r[0]
             value_1 = r[1]
             if value_0 == value_1:
-                self.mark_range += str(value_0) + ", "
+                self.mark_range += str(value_0) + mark_separator
             else:
-                self.mark_range += str(value_0) + "-" + str(value_1) + ", "
-        self.mark_range = self.mark_range[:-2]
+                self.mark_range += str(value_0) + "-" + str(value_1) + mark_separator
+
+        # "1, 2, 3, 4, " -> "1, 2, 3, 4"
+        self.mark_range = remove_suffix(self.mark_range, mark_separator)
 
     def get_ranges(self, list_of_marks):
+        """
+        Возвращает значение диапазона марок свай на основе списка марок.
+        """
         for a, b in itertools.groupby(enumerate(list_of_marks), lambda pair: pair[1] - pair[0]):
             b = list(b)
             yield b[0][1], b[-1][1]
 
     def write_ranges(self):
+        """
+        Записывает диапазон марок mark_range в параметр param_name_for_write у каждой сваи.
+        Обычно param_name_for_write = "ФОП_Примечание"
+        """
         if not self.piles:
             print('При работе с типом {} не было отобрано ни одной сваи!'.format(self.pile_type_name))
         for pile in self.piles:
             pile.GetParam(param_name_for_write).Set(self.mark_range)
 
+    def get_all_marks(self):
+        return remove_suffix(self.all_marks, mark_separator)
+
+
+def remove_suffix(string, suffix):
+    """
+    :param string: строка, в которой нужно удалить суффикс
+    :param suffix: подстрока, которую нужно найти в строке и удалить
+    :return: Возвращает строку без указанного окончания или полученную строку в исходном состоянии,
+    если указанного окончания нет.
+    Напр., "1, 2, 3, 4, " -> "1, 2, 3, 4", когда подстрока ", "
+    """
+    if string.endswith(suffix):
+        last_sep_index = string.rfind(suffix)
+        return string[:last_sep_index]
+    else:
+        return string
+
 
 def get_piles():
+    """
+    Возвращает список выбранных свай - экземпляров Revit, которые имеют в имени типа "Свая".
+    """
     selected_elem_ids = uidoc.Selection.GetElementIds()
     if selected_elem_ids.Count == 0:
+        output.close()
         alert("Выберите сваи перед тем, как использовать плагин", exitscript=True)
     piles = []
     for id in selected_elem_ids:
@@ -93,11 +166,15 @@ def get_piles():
             piles.append(elem)
 
     if len(piles) == 0:
+        output.close()
         alert("Выберите сваи", exitscript=True)
     return piles
 
 
 def get_pile_types(piles):
+    """
+    Возвращает список типоразмеров обернутых классом-оболочкой RevitPileType
+    """
     dictionary = {}
     for pile in piles:
         pile_name = pile.Name
@@ -109,6 +186,16 @@ def get_pile_types(piles):
 
 
 def write_values_of_pile_ranges(pile_types):
+    """
+    Получает диапазон марок для каждого типоразмера свай.
+    Записывает в параметр param_name_for_write у каждого экземпляра сваи.
+    Обычно param_name_for_write = "ФОП_Примечание".
+    Возвращает отчет для табличного вывода,
+    где каждый элемент отчета - [{1}, {2}, {3}], где
+    - {1} - имя типоразмера;
+    - {2} - марки всех свай типоразмера;
+    - {3} - диапазон марок
+    """
     report = []
     with revit.Transaction("BIM: Диапазоны свай"):
         for pile_type in pile_types:
@@ -121,11 +208,12 @@ def write_values_of_pile_ranges(pile_types):
             report.append(
                 [
                     pile_type.pile_type_name,
-                    pile_type.all_marks,
+                    pile_type.get_all_marks(),
                     pile_type.mark_range
                 ]
             )
     return report
+
 
 @notification()
 @log_plugin(EXEC_PARAMS.command_name)
@@ -144,14 +232,13 @@ def script_execute(plugin_logger):
     # Выполняем расчет и запись диапазонов свай в экземпляры свай
     report = write_values_of_pile_ranges(pile_types)
 
-    print("В таблице ниже обработанные сваи:")
-    output = script.output.get_output()
+    print("В таблице ниже успешно обработанные сваи:")
     output.print_table(table_data=report,
                        title="Отчет работы плагина",
                        columns=["Тип сваи", "Марки свай", "Диапазон марок"])
 
     if pile_ids_without_mark:
-        print("\nНайдены не замаркированные сваи:")
+        print("\nНайдены некорректно замаркированные сваи:")
         for pile_id_without_mark in pile_ids_without_mark:
             print('{}: {}'.format("- свая с id: ", output.linkify(pile_id_without_mark)))
 
