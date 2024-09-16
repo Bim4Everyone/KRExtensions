@@ -237,7 +237,7 @@ def script_execute(plugin_logger):
 
     revit_materials = []
     for material in materials:
-        keynote = material.GetParam(BuiltInParameter.KEYNOTE_PARAM).AsString()
+        keynote = material.GetParamValueOrDefault(BuiltInParameter.KEYNOTE_PARAM)
 
         # Отсеиваем ситуации, когда у материала не указана Ключевая заметка (код работы)
         if not keynote:
