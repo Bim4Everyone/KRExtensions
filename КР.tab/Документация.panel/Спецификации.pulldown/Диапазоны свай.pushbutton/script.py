@@ -257,6 +257,14 @@ def write_values_of_pile_ranges(pile_types):
                     pile_type.elevation_after_cutting
                 ]
             )
+
+    report.append([
+                    "-",
+                    "-",
+                    "-",
+                    "-",
+                    "-"
+                ])
     return report
 
 
