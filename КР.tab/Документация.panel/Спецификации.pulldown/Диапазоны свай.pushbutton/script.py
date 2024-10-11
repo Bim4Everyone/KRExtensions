@@ -45,9 +45,15 @@ mark_separator = ", "
 class RevitPileType:
     """Класс-оболочка для типоразмера элемента сваи."""
 
-    def __init__(self, pile_type_name):
+    def __init__(self, pile_type_name, pile_elevation_after_driving, pile_elevation_after_cutting):
         self.pile_type_name = pile_type_name
         """Имя типоразмера сваи"""
+
+        self.elevation_after_driving = pile_elevation_after_driving
+        """Высотная отметка сваи после забивки"""
+
+        self.elevation_after_cutting = pile_elevation_after_cutting
+        """Высотная отметка сваи после срубки"""
 
         self.piles = []
         """Перечень свай этого типоразмера семейства"""
@@ -177,13 +183,46 @@ def get_pile_types(piles):
     """
     dictionary = {}
     for pile in piles:
+        """
+        Распределение по типам необходимо выполнить по трем параметрам:
+        - имя типа;
+        - высотная отметка головы сваи;
+        - высотная отметка головы сваи после срубки.
+        Для удобства сформируем ключ из этих значений.
+        """
         pile_name = pile.Name
-        if pile_name not in dictionary.keys():
-            dictionary[pile_name] = RevitPileType(pile_name)
-        dictionary[pile_name].add_pile(pile)
+        pile_elevation_after_driving_as_str, pile_elevation_after_cutting_as_str = get_pile_elevations(pile)
+
+        # Формируем строку "Тип 1_-3500_-3700"
+        key = '{0}_{1}_{2}'.format(
+            pile_name,
+            pile_elevation_after_driving_as_str,
+            pile_elevation_after_cutting_as_str)
+
+        if key not in dictionary.keys():
+            dictionary[key] = RevitPileType(
+                pile_name,
+                pile_elevation_after_driving_as_str,
+                pile_elevation_after_cutting_as_str)
+        dictionary[key].add_pile(pile)
 
     return dictionary.values()
 
+def get_pile_elevations(pile):
+    # Получаем высотную отметку головы сваи
+    pile_elevation_after_driving = pile.GetParam("ФОП_Смещение от уровня").AsValueString()
+    pile_elevation_after_driving_as_int = int(pile_elevation_after_driving)
+
+    # Получаем длину срезки сваи
+    pile_cutting_length = pile.GetParam("ФОП_Сваи_Срубка головы_Длина").AsValueString()
+    pile_cutting_length_as_int = int(pile_cutting_length)
+
+    # Получаем высотную отметки головы сваи после срезки
+    pile_elevation_after_cutting_as_int = pile_elevation_after_driving_as_int - pile_cutting_length_as_int
+
+    pile_elevation_after_driving_as_str = str(pile_elevation_after_driving_as_int)
+    pile_elevation_after_cutting_as_str = str(pile_elevation_after_cutting_as_int)
+    return pile_elevation_after_driving_as_str, pile_elevation_after_cutting_as_str
 
 def write_values_of_pile_ranges(pile_types):
     """
@@ -191,10 +230,12 @@ def write_values_of_pile_ranges(pile_types):
     Записывает в параметр param_name_for_write у каждого экземпляра сваи.
     Обычно param_name_for_write = "ФОП_Примечание".
     Возвращает отчет для табличного вывода,
-    где каждый элемент отчета - [{1}, {2}, {3}], где
+    где каждый элемент отчета - [{1}, {2}, {3}, {4}, {5}], где
     - {1} - имя типоразмера;
     - {2} - марки всех свай типоразмера;
     - {3} - диапазон марок
+    - {4} - высотная отметка после забивки
+    - {5} - высотная отметка после срубки
     """
     report = []
     with revit.Transaction("BIM: Диапазоны свай"):
@@ -205,11 +246,15 @@ def write_values_of_pile_ranges(pile_types):
             #   - имя типоразмера свай;
             #   - марки свай этого типа через запятую;
             #   - марки свай этого типа диапазоном;
+            #   - высотная отметка после забивки;
+            #   - высотная отметка после срубки
             report.append(
                 [
                     pile_type.pile_type_name,
                     pile_type.get_all_marks(),
-                    pile_type.mark_range
+                    pile_type.mark_range,
+                    pile_type.elevation_after_driving,
+                    pile_type.elevation_after_cutting
                 ]
             )
     return report
@@ -235,7 +280,12 @@ def script_execute(plugin_logger):
     print("В таблице ниже успешно обработанные сваи:")
     output.print_table(table_data=report,
                        title="Отчет работы плагина",
-                       columns=["Тип сваи", "Марки свай", "Диапазон марок"])
+                       columns=[
+                           "Тип сваи",
+                           "Марки свай",
+                           "Диапазон марок",
+                           "Отм. после забивки",
+                           "Отм. после срубки"])
 
     if pile_ids_without_mark:
         print("\nНайдены некорректно замаркированные сваи:")
