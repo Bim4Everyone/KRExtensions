@@ -34,6 +34,9 @@ param_name_for_height = 'ФОП_РАЗМ_Высота'
 param_name_for_reinforcement = 'обр_ФОП_АРМ_Пилон'
 param_name_for_write = 'Марка'
 
+tag_elbow_offset = XYZ(2.0, 3.0, 0.0)
+tag_header_offset = XYZ(3.5, 0.0, 0.0)
+
 
 def get_pylons():
     selected_ids = uidoc.Selection.GetElementIds()
@@ -71,8 +74,9 @@ def get_waterproofing(pylon):
 @log_plugin(EXEC_PARAMS.command_name)
 def script_execute(plugin_logger):
     pairs_for_write = []
+    pylons = get_pylons()
 
-    for pylon in get_pylons():
+    for pylon in pylons:
         try:
             pylon_type = doc.GetElement(pylon.GetTypeId())
 
@@ -102,11 +106,56 @@ def script_execute(plugin_logger):
         except Exception as e:
             alert(e.message + " у пилона с id: " + str(pylon.Id), exitscript=False)
 
-    for pair_for_write in pairs_for_write:
-        with revit.Transaction("КР: Маркировка пилонов"):
-            pylon = pair_for_write[0]
-            string_for_write = pair_for_write[1]
-            pylon.GetParam(param_name_for_write).Set(string_for_write)
+    with revit.Transaction("КР: Маркировка пилонов"):
+        for pair_for_write in pairs_for_write:
+            try:
+                pylon = pair_for_write[0]
+                string_for_write = pair_for_write[1]
+                pylon.GetParam(param_name_for_write).Set(string_for_write)
+            except:
+                alert("Не удалось записать значение у пилона с id: " + str(pylon.Id), exitscript=False)
+
+
+    view = doc.ActiveView
+
+    tag_mode = TagMode.TM_ADDBY_CATEGORY
+    tag_orientation = TagOrientation.Horizontal
+
+    families = FilteredElementCollector(doc).OfCategory(BuiltInCategory.INVALID).OfClass(Family)
+
+    tag_family = None
+    for family in families:
+        if family.Name.Contains('!Марка_Несущая колонны'):
+            tag_family = family
+            break
+
+    tag_type_id = None
+    if tag_family is not None:
+        for symbol_id in tag_family.GetFamilySymbolIds():
+            tag_symbol = doc.GetElement(symbol_id)
+            tag_symbol_name = tag_symbol.get_Parameter(BuiltInParameter.SYMBOL_NAME_PARAM).AsString()
+            if tag_symbol_name == 'Марка_Полка 20 мм':
+                tag_type_id = symbol_id
+                break
+
+    with revit.Transaction("КР: Размещение марок пилонов"):
+        for pylon in pylons:
+            pylon_ref = Reference(pylon)
+            pylon_mid = pylon.Location.Point
+
+            leader_point = pylon_mid + XYZ(5.0, 5.0, 0.0)
+            pylon_tag = IndependentTag.Create(doc, view.Id, pylon_ref, True, tag_mode, tag_orientation, leader_point)
+
+            pylon_tag.LeaderEndCondition = LeaderEndCondition.Free
+            elbow_point = pylon_tag.LeaderEnd + tag_elbow_offset
+            pylon_tag.LeaderElbow = elbow_point
+
+            header_point = elbow_point + tag_header_offset
+            pylon_tag.TagHeadPosition = header_point
+
+            if tag_type_id is not None:
+                pylon_tag.ChangeTypeId(tag_type_id)
+
 
 
 script_execute()
