@@ -1,0 +1,12 @@
+title:
+  ru: "Маркировка\nпилонов"
+  en_us: "Pylon\nmarkings"
+
+tooltip:
+  ru: Выполняет маркировку выбранных пилонов в соответствии с их размерами и выбранным армированием.
+  en_us: Performs marking of selected pylons according to their dimensions and selected reinforcement.
+
+author: DivinN
+
+min_revit_version: 2022
+max_revit_version: 2024
