@@ -69,45 +69,43 @@ def get_waterproofing(pylon):
             break
     return waterproofing
 
-
-@notification()
-@log_plugin(EXEC_PARAMS.command_name)
-def script_execute(plugin_logger):
-    pairs_for_write = []
-    pylons = get_pylons()
-
+def get_pylon_data(pylons):
+    pylon_and_data_pairs = []
     for pylon in pylons:
         try:
             pylon_type = doc.GetElement(pylon.GetTypeId())
-
+            # Получаем длину пилона
             length = convert_to_int_from_internal_value(
                 pylon_type.GetParamValue(param_name_for_length),
                 UnitTypeId.Decimeters)
-
+            # Получаем толщину пилона
             width = convert_to_int_from_internal_value(
                 pylon_type.GetParamValue(param_name_for_width),
                 UnitTypeId.Centimeters)
-
+            # Получаем высоту пилона
             height = convert_to_int_from_internal_value(
                 pylon.GetParamValue(param_name_for_height),
                 UnitTypeId.Decimeters)
-
+            # Получаем выбранное пользователем армирование для пилона
             reinforcement = pylon.GetParamValue(param_name_for_reinforcement)
             if reinforcement is None:
                 raise Exception("Не удалось определить армирование, заполните ТЗА")
-
+            # Получаем суффикс, указывающий на наличие добавок в бетоне пилона
             waterproofing = get_waterproofing(pylon)
-
+            # Формируем строку в требуемом формате
             string_for_write = ('{0}.{1}.{2}-{3}{4}'
                                 .format(str(length), str(width), str(height), reinforcement, waterproofing))
 
-            pairs_for_write.append([pylon, string_for_write])
+            pylon_and_data_pairs.append([pylon, string_for_write])
 
         except Exception as e:
             alert(e.message + " у пилона с id: " + str(pylon.Id), exitscript=False)
+    return pylon_and_data_pairs
 
+
+def write_pylon_data(pylon_and_data_pairs):
     with revit.Transaction("КР: Маркировка пилонов"):
-        for pair_for_write in pairs_for_write:
+        for pair_for_write in pylon_and_data_pairs:
             try:
                 pylon = pair_for_write[0]
                 string_for_write = pair_for_write[1]
@@ -116,11 +114,8 @@ def script_execute(plugin_logger):
                 alert("Не удалось записать значение у пилона с id: " + str(pylon.Id), exitscript=False)
 
 
-    view = doc.ActiveView
 
-    tag_mode = TagMode.TM_ADDBY_CATEGORY
-    tag_orientation = TagOrientation.Horizontal
-
+def get_pylon_tag_type_id():
     families = FilteredElementCollector(doc).OfCategory(BuiltInCategory.INVALID).OfClass(Family)
 
     tag_family = None
@@ -129,14 +124,21 @@ def script_execute(plugin_logger):
             tag_family = family
             break
 
-    tag_type_id = None
-    if tag_family is not None:
-        for symbol_id in tag_family.GetFamilySymbolIds():
-            tag_symbol = doc.GetElement(symbol_id)
-            tag_symbol_name = tag_symbol.get_Parameter(BuiltInParameter.SYMBOL_NAME_PARAM).AsString()
-            if tag_symbol_name == 'Марка_Полка 20 мм':
-                tag_type_id = symbol_id
-                break
+    if tag_family is None:
+        return None
+
+    for symbol_id in tag_family.GetFamilySymbolIds():
+        tag_symbol = doc.GetElement(symbol_id)
+        tag_symbol_name = tag_symbol.get_Parameter(BuiltInParameter.SYMBOL_NAME_PARAM).AsString()
+        if tag_symbol_name == 'Марка_Полка 20 мм':
+            return symbol_id
+    return None
+
+
+def place_pylon_tags(pylons, tag_type_id):
+    view = doc.ActiveView
+    tag_mode = TagMode.TM_ADDBY_CATEGORY
+    tag_orientation = TagOrientation.Horizontal
 
     with revit.Transaction("КР: Размещение марок пилонов"):
         for pylon in pylons:
@@ -156,6 +158,17 @@ def script_execute(plugin_logger):
             if tag_type_id is not None:
                 pylon_tag.ChangeTypeId(tag_type_id)
 
+
+@notification()
+@log_plugin(EXEC_PARAMS.command_name)
+def script_execute(plugin_logger):
+    pylons = get_pylons()
+
+    pylon_and_data_pairs = get_pylon_data(pylons)
+    write_pylon_data(pylon_and_data_pairs)
+
+    tag_type_id = get_pylon_tag_type_id()
+    place_pylon_tags(pylons, tag_type_id)
 
 
 script_execute()
