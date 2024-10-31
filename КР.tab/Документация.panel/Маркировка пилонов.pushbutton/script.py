@@ -43,7 +43,6 @@ tag_elbow_offset = XYZ(2.0, 3.0, 0.0)
 tag_header_offset = XYZ(3.5, 0.0, 0.0)
 
 report_about_write = []
-report_about_tag = []
 
 def get_pylons():
     selected_ids = uidoc.Selection.GetElementIds()
@@ -119,10 +118,10 @@ def write_pylon_data(pylon_and_data_pairs):
             string_for_write = pair_for_write[1]
             try:
                 pylon.GetParam(param_name_for_write).Set(string_for_write)
-                report_about_write.append([pylon.Name, output.linkify(pylon.Id), string_for_write])
+                report_about_write.append([pylon.Name, output.linkify(pylon.Id), string_for_write, '', pylon])
             except:
                 error = "Не удалось записать значение у пилона с id: " + str(pylon.Id)
-                report_about_write.append([pylon.Name, output.linkify(pylon.Id), error])
+                report_about_write.append([pylon.Name, output.linkify(pylon.Id), error, '', pylon])
 
 
 def get_pylon_tag_type_id():
@@ -145,27 +144,34 @@ def get_pylon_tag_type_id():
     return None
 
 
-def place_pylon_tags(pylons, tag_type_id):
+def place_pylon_tags(tag_type_id):
     tag_mode = TagMode.TM_ADDBY_CATEGORY
     tag_orientation = TagOrientation.Horizontal
 
     with revit.Transaction("КР: Размещение марок пилонов"):
-        for pylon in pylons:
-            pylon_ref = Reference(pylon)
-            pylon_mid = pylon.Location.Point
+        for report_string in report_about_write:
+            pylon = report_string[4]
 
-            leader_point = pylon_mid + XYZ(5.0, 5.0, 0.0)
-            pylon_tag = IndependentTag.Create(doc, active_view.Id, pylon_ref, True, tag_mode, tag_orientation, leader_point)
+            try:
+                pylon_ref = Reference(pylon)
+                pylon_mid = pylon.Location.Point
 
-            pylon_tag.LeaderEndCondition = LeaderEndCondition.Free
-            elbow_point = pylon_tag.LeaderEnd + tag_elbow_offset
-            pylon_tag.LeaderElbow = elbow_point
+                leader_point = pylon_mid + XYZ(5.0, 5.0, 0.0)
+                pylon_tag = IndependentTag.Create(doc, active_view.Id, pylon_ref, True, tag_mode, tag_orientation, leader_point)
 
-            header_point = elbow_point + tag_header_offset
-            pylon_tag.TagHeadPosition = header_point
+                pylon_tag.LeaderEndCondition = LeaderEndCondition.Free
+                elbow_point = pylon_tag.LeaderEnd + tag_elbow_offset
+                pylon_tag.LeaderElbow = elbow_point
 
-            if tag_type_id is not None:
-                pylon_tag.ChangeTypeId(tag_type_id)
+                header_point = elbow_point + tag_header_offset
+                pylon_tag.TagHeadPosition = header_point
+
+                if tag_type_id is not None:
+                    pylon_tag.ChangeTypeId(tag_type_id)
+
+                report_string[3] = output.linkify(pylon_tag.Id)
+            except:
+                report_string[3] = '<Не размещена>'
 
 
 @notification()
@@ -188,20 +194,6 @@ def script_execute(plugin_logger):
     pylon_and_data_pairs = get_pylon_data(pylons)
     write_pylon_data(pylon_and_data_pairs)
 
-    '''
-        При печати таблицы встречается ошибка, когда таблица по неустановленной причине печататься не хочет
-        Решается добавлением в коллекцию еще одной строки
-        Чтобы не отвлекать пользователя в доп строке содержится один невидимый символ (это не пробел)
-    '''
-    report_about_write.append(["", "", ""])
-
-    output.print_table(table_data=report_about_write[:],
-                       title="Отчет работы плагина",
-                       columns=[
-                           "Имя типоразмера",
-                           "ID пилона",
-                           "Данные"]
-                       )
 
     if active_view.ViewType == ViewType.FloorPlan or active_view.ViewType == ViewType.EngineeringPlan:
         print('Выполняем поиск марки несущих колонн семейства \"{0}\" типоразмера \"{1}\".'
@@ -212,9 +204,25 @@ def script_execute(plugin_logger):
         else:
             print("Семейство и типоразмер марки найдено! Выполняем размещение марок на активном виде.")
 
-        place_pylon_tags(pylons, tag_type_id)
+        place_pylon_tags(tag_type_id)
     else:
         print('Текущий вид не является видом в плане, поэтому размещение марок производиться не будет!')
+
+
+    '''
+        При печати таблицы встречается ошибка, когда таблица по неустановленной причине печататься не хочет
+        Решается добавлением в коллекцию еще одной строки
+        Чтобы не отвлекать пользователя в доп строке содержится один невидимый символ (это не пробел)
+    '''
+    report_about_write.append(["", "", "", "", ""])
+    output.print_table(table_data=report_about_write[:],
+                       title="Отчет работы плагина",
+                       columns=[
+                           "Имя типоразмера",
+                           "ID пилона",
+                           "Данные",
+                           "ID марки"]
+                       )
 
     print("Скрипт завершил работу!")
 
