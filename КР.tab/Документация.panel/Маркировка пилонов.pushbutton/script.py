@@ -27,6 +27,8 @@ from dosymep_libs.bim4everyone import *
 doc = __revit__.ActiveUIDocument.Document
 uidoc = __revit__.ActiveUIDocument
 app = doc.Application
+active_view = doc.ActiveView
+output = script.output.get_output()
 
 param_name_for_length = 'ФОП_РАЗМ_Длина'
 param_name_for_width = 'ФОП_РАЗМ_Ширина'
@@ -34,23 +36,29 @@ param_name_for_height = 'ФОП_РАЗМ_Высота'
 param_name_for_reinforcement = 'обр_ФОП_АРМ_Пилон'
 param_name_for_write = 'Марка'
 
+tag_family_name = '!Марка_Несущая колонны'
+tag_type_name = 'Марка_Полка 20 мм'
+
 tag_elbow_offset = XYZ(2.0, 3.0, 0.0)
 tag_header_offset = XYZ(3.5, 0.0, 0.0)
 
+report_about_write = []
+report_about_tag = []
 
 def get_pylons():
     selected_ids = uidoc.Selection.GetElementIds()
 
     if len(selected_ids) == 0:
-        output = script.output.get_output()
+        global output
         output.close()
         alert("Не выбрано ни одного элемента", exitscript=True)
 
     elements = [doc.GetElement(selectedId) for selectedId in selected_ids]
-    pylons = [elem for elem in elements if elem.Name.Contains('Пилон')]
+    pylons = [elem for elem in elements
+              if elem.Category.Name.Contains('Несущие колонны') and elem.Name.Contains('Пилон')]
 
     if len(pylons) == 0:
-        output = script.output.get_output()
+        global output
         output.close()
         alert("Не выбрано ни одного пилона", exitscript=True)
     return pylons
@@ -68,6 +76,7 @@ def get_waterproofing(pylon):
             waterproofing = '-д'
             break
     return waterproofing
+
 
 def get_pylon_data(pylons):
     pylon_and_data_pairs = []
@@ -99,20 +108,21 @@ def get_pylon_data(pylons):
             pylon_and_data_pairs.append([pylon, string_for_write])
 
         except Exception as e:
-            alert(e.message + " у пилона с id: " + str(pylon.Id), exitscript=False)
+            print ("Ошибка у пилона с id {0}: ".format(pylon.Id) + e.message)
     return pylon_and_data_pairs
 
 
 def write_pylon_data(pylon_and_data_pairs):
     with revit.Transaction("КР: Маркировка пилонов"):
         for pair_for_write in pylon_and_data_pairs:
+            pylon = pair_for_write[0]
+            string_for_write = pair_for_write[1]
             try:
-                pylon = pair_for_write[0]
-                string_for_write = pair_for_write[1]
                 pylon.GetParam(param_name_for_write).Set(string_for_write)
+                report_about_write.append([pylon.Name, output.linkify(pylon.Id), string_for_write])
             except:
-                alert("Не удалось записать значение у пилона с id: " + str(pylon.Id), exitscript=False)
-
+                error = "Не удалось записать значение у пилона с id: " + str(pylon.Id)
+                report_about_write.append([pylon.Name, output.linkify(pylon.Id), error])
 
 
 def get_pylon_tag_type_id():
@@ -120,7 +130,7 @@ def get_pylon_tag_type_id():
 
     tag_family = None
     for family in families:
-        if family.Name.Contains('!Марка_Несущая колонны'):
+        if family.Name.Contains(tag_family_name):
             tag_family = family
             break
 
@@ -130,13 +140,12 @@ def get_pylon_tag_type_id():
     for symbol_id in tag_family.GetFamilySymbolIds():
         tag_symbol = doc.GetElement(symbol_id)
         tag_symbol_name = tag_symbol.get_Parameter(BuiltInParameter.SYMBOL_NAME_PARAM).AsString()
-        if tag_symbol_name == 'Марка_Полка 20 мм':
+        if tag_symbol_name == tag_type_name:
             return symbol_id
     return None
 
 
 def place_pylon_tags(pylons, tag_type_id):
-    view = doc.ActiveView
     tag_mode = TagMode.TM_ADDBY_CATEGORY
     tag_orientation = TagOrientation.Horizontal
 
@@ -146,7 +155,7 @@ def place_pylon_tags(pylons, tag_type_id):
             pylon_mid = pylon.Location.Point
 
             leader_point = pylon_mid + XYZ(5.0, 5.0, 0.0)
-            pylon_tag = IndependentTag.Create(doc, view.Id, pylon_ref, True, tag_mode, tag_orientation, leader_point)
+            pylon_tag = IndependentTag.Create(doc, active_view.Id, pylon_ref, True, tag_mode, tag_orientation, leader_point)
 
             pylon_tag.LeaderEndCondition = LeaderEndCondition.Free
             elbow_point = pylon_tag.LeaderEnd + tag_elbow_offset
@@ -162,13 +171,52 @@ def place_pylon_tags(pylons, tag_type_id):
 @notification()
 @log_plugin(EXEC_PARAMS.command_name)
 def script_execute(plugin_logger):
+    print("Здравствуйте! Данный плагин предназначен для маркировки пилонов на основе следующих параметров:")
+    print("- \"ФОП_РАЗМ_Длина\"")
+    print("- \"ФОП_РАЗМ_Ширина\"")
+    print("- \"ФОП_РАЗМ_Высота\"")
+    print("- \"обр_ФОП_АРМ_Пилон\"")
+
+    print("Запись будет производиться в параметр \"Марка\".")
+
+    print("Из всех выбранных элементов будут отобраны только те, что имеют имя типа со словом \"Пилон\".")
+    print("Например, \"НН_Пилон-350х1800 (ЖБ B40 F150 W6)\".")
+
     pylons = get_pylons()
+    print("Найдено пилонов: {0}".format(len(pylons)))
 
     pylon_and_data_pairs = get_pylon_data(pylons)
     write_pylon_data(pylon_and_data_pairs)
 
-    tag_type_id = get_pylon_tag_type_id()
-    place_pylon_tags(pylons, tag_type_id)
+    '''
+        При печати таблицы встречается ошибка, когда таблица по неустановленной причине печататься не хочет
+        Решается добавлением в коллекцию еще одной строки
+        Чтобы не отвлекать пользователя в доп строке содержится один невидимый символ (это не пробел)
+    '''
+    report_about_write.append(["", "", ""])
+
+    output.print_table(table_data=report_about_write[:],
+                       title="Отчет работы плагина",
+                       columns=[
+                           "Имя типоразмера",
+                           "ID пилона",
+                           "Данные"]
+                       )
+
+    if active_view.ViewType == ViewType.FloorPlan or active_view.ViewType == ViewType.EngineeringPlan:
+        print('Выполняем поиск марки несущих колонн семейства \"{0}\" типоразмера \"{1}\".'
+              .format(tag_family_name, tag_type_name))
+        tag_type_id = get_pylon_tag_type_id()
+        if tag_type_id is None:
+            print("Не найдено семейство или типоразмер марки, поэтому будем размещать стандартную.")
+        else:
+            print("Семейство и типоразмер марки найдено! Выполняем размещение марок на активном виде.")
+
+        place_pylon_tags(pylons, tag_type_id)
+    else:
+        print('Текущий вид не является видом в плане, поэтому размещение марок производиться не будет!')
+
+    print("Скрипт завершил работу!")
 
 
 script_execute()
