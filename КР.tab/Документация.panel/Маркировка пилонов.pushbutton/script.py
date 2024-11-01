@@ -107,7 +107,7 @@ def get_pylon_data(pylons):
             pylon_and_data_pairs.append([pylon, string_for_write])
 
         except Exception as e:
-            print ("Ошибка у пилона с id {0}: ".format(pylon.Id) + e.message)
+            print ("Ошибка у пилона с id {0}: ".format(output.linkify(pylon.Id)) + e.message)
     return pylon_and_data_pairs
 
 
@@ -220,9 +220,10 @@ def script_execute(plugin_logger):
     print("Например, \"НН_Пилон-350х1800 (ЖБ B40 F150 W6)\".")
 
     pylons = get_pylons()
+    print("⠀")
     print("Найдено пилонов: {0}".format(len(pylons)))
-
     pylon_and_data_pairs = get_pylon_data(pylons)
+    print("⠀")
     write_pylon_data(pylon_and_data_pairs)
 
     pylon_markings()
