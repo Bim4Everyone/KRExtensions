@@ -144,6 +144,32 @@ def get_pylon_tag_type_id():
     return None
 
 
+def pylon_markings():
+    if active_view.ViewType == ViewType.FloorPlan or active_view.ViewType == ViewType.EngineeringPlan:
+        print('Выполняем поиск марки несущих колонн семейства \"{0}\" типоразмера \"{1}\".'
+              .format(tag_family_name, tag_type_name))
+        tag_type_id = get_pylon_tag_type_id()
+        if tag_type_id is None:
+            print("Не найдено семейство или типоразмер марки, поэтому будем размещать стандартную.")
+        else:
+            print("Семейство и типоразмер марки найдено! Выполняем размещение марок на активном виде.")
+
+        place_pylon_tags(tag_type_id)
+    else:
+        print('Текущий вид не является видом в плане, поэтому размещение марок производиться не будет!')
+
+
+def already_has_mark(pylon, tag_type_id):
+    element_class_filter = ElementClassFilter(IndependentTag)
+    pylon_tag_ids = pylon.GetDependentElements(element_class_filter)
+
+    for pylon_tag_id in pylon_tag_ids:
+        existing_pylon_tag = doc.GetElement(pylon_tag_id)
+        if existing_pylon_tag.GetTypeId() == tag_type_id and existing_pylon_tag.OwnerViewId == active_view.Id:
+            return True
+    return False
+
+
 def place_pylon_tags(tag_type_id):
     tag_mode = TagMode.TM_ADDBY_CATEGORY
     tag_orientation = TagOrientation.Horizontal
@@ -151,6 +177,11 @@ def place_pylon_tags(tag_type_id):
     with revit.Transaction("КР: Размещение марок пилонов"):
         for report_string in report_about_write:
             pylon = report_string[4]
+
+            # Если пилон уже имеет марку нужного нам типа, то пропускаем, размещать повторно не нужно
+            if already_has_mark(pylon, tag_type_id):
+                report_string[3] = '<Уже размещена>'
+                continue
 
             try:
                 pylon_ref = Reference(pylon)
@@ -194,33 +225,20 @@ def script_execute(plugin_logger):
     pylon_and_data_pairs = get_pylon_data(pylons)
     write_pylon_data(pylon_and_data_pairs)
 
-
-    if active_view.ViewType == ViewType.FloorPlan or active_view.ViewType == ViewType.EngineeringPlan:
-        print('Выполняем поиск марки несущих колонн семейства \"{0}\" типоразмера \"{1}\".'
-              .format(tag_family_name, tag_type_name))
-        tag_type_id = get_pylon_tag_type_id()
-        if tag_type_id is None:
-            print("Не найдено семейство или типоразмер марки, поэтому будем размещать стандартную.")
-        else:
-            print("Семейство и типоразмер марки найдено! Выполняем размещение марок на активном виде.")
-
-        place_pylon_tags(tag_type_id)
-    else:
-        print('Текущий вид не является видом в плане, поэтому размещение марок производиться не будет!')
-
+    pylon_markings()
 
     '''
         При печати таблицы встречается ошибка, когда таблица по неустановленной причине печататься не хочет
         Решается добавлением в коллекцию еще одной строки
         Чтобы не отвлекать пользователя в доп строке содержится один невидимый символ (это не пробел)
     '''
-    report_about_write.append(["", "", "", "", ""])
+    report_about_write.append(["⠀", "", "", "", ""])
     output.print_table(table_data=report_about_write[:],
                        title="Отчет работы плагина",
                        columns=[
                            "Имя типоразмера",
                            "ID пилона",
-                           "Данные",
+                           "Марка пилона",
                            "ID марки"]
                        )
 
