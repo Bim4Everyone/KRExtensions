@@ -37,7 +37,11 @@ param_name_for_reinforcement = 'обр_ФОП_АРМ_Пилон'
 param_name_for_write = 'Марка'
 
 tag_family_name = '!Марка_Несущая колонны'
-tag_type_name = 'Марка_Полка 20 мм'
+# tag_type_name = 'Марка_Полка 20 мм'
+
+tag_symbols_dict = {}
+tag_symbol_name_prefix = 'Марка_Полка '
+tag_symbol_name_suffix = ' мм'
 
 tag_elbow_offset = XYZ(2.0, 3.0, 0.0)
 tag_header_offset = XYZ(3.5, 0.0, 0.0)
@@ -124,7 +128,8 @@ def write_pylon_data(pylon_and_data_pairs):
                 report_about_write.append([pylon.Name, output.linkify(pylon.Id), error, '', pylon])
 
 
-def get_pylon_tag_type_id():
+def get_pylon_tag_types():
+    print('Выполняем поиск семейства марки несущих колонн \"{0}\".'.format(tag_family_name))
     families = FilteredElementCollector(doc).OfCategory(BuiltInCategory.INVALID).OfClass(Family)
 
     tag_family = None
@@ -134,43 +139,44 @@ def get_pylon_tag_type_id():
             break
 
     if tag_family is None:
+        print("Семейство марки \"{0}\" не найдено, поэтому будем размещать стандартную.".format(tag_family_name))
         return None
+
+    print('Семейство марки найдено! Выполняем поиск нужных типоразмеров марки.')
+    print('Ищем те типоразмеры, которые начинаются с \"{0}\" и заканчиваются на \"{1}\".'
+          .format(tag_symbol_name_prefix, tag_symbol_name_suffix))
 
     for symbol_id in tag_family.GetFamilySymbolIds():
         tag_symbol = doc.GetElement(symbol_id)
         tag_symbol_name = tag_symbol.get_Parameter(BuiltInParameter.SYMBOL_NAME_PARAM).AsString()
-        if tag_symbol_name == tag_type_name:
-            return symbol_id
-    return None
+
+        if tag_symbol_name.startswith(tag_symbol_name_prefix) and tag_symbol_name.endswith(tag_symbol_name_suffix):
+            try:
+                number = tag_symbol_name.replace(tag_symbol_name_prefix, '').replace(tag_symbol_name_suffix, '')
+                number = int(number) * 100
+                tag_symbols_dict[number] = tag_symbol
+            except:
+                continue
+
+    if tag_symbols_dict.keys():
+        print("Подходящие типоразмеры марки найдены:")
+        for tag_symbol in tag_symbols_dict.values():
+            tag_symbol_name = tag_symbol.get_Parameter(BuiltInParameter.SYMBOL_NAME_PARAM).AsString()
+            print('- \"{0}\"'.format(tag_symbol_name))
+    else:
+        print("Не найдены необходимые типоразмеры в семейство марки \"{0}\", размещать будем стандартную."
+              .format(tag_family_name))
 
 
 def pylon_markings():
     if active_view.ViewType == ViewType.FloorPlan or active_view.ViewType == ViewType.EngineeringPlan:
-        print('Выполняем поиск марки несущих колонн семейства \"{0}\" типоразмера \"{1}\".'
-              .format(tag_family_name, tag_type_name))
-        tag_type_id = get_pylon_tag_type_id()
-        if tag_type_id is None:
-            print("Не найдено семейство или типоразмер марки, поэтому будем размещать стандартную.")
-        else:
-            print("Семейство и типоразмер марки найдено! Выполняем размещение марок на активном виде.")
-
-        place_pylon_tags(tag_type_id)
+        place_pylon_tags()
+        print('Выполняем размещение марок пилонов.')
     else:
         print('Текущий вид не является видом в плане, поэтому размещение марок производиться не будет!')
 
 
-def already_has_mark(pylon, tag_type_id):
-    element_class_filter = ElementClassFilter(IndependentTag)
-    pylon_tag_ids = pylon.GetDependentElements(element_class_filter)
-
-    for pylon_tag_id in pylon_tag_ids:
-        existing_pylon_tag = doc.GetElement(pylon_tag_id)
-        if existing_pylon_tag.GetTypeId() == tag_type_id and existing_pylon_tag.OwnerViewId == active_view.Id:
-            return True
-    return False
-
-
-def place_pylon_tags(tag_type_id):
+def place_pylon_tags():
     tag_mode = TagMode.TM_ADDBY_CATEGORY
     tag_orientation = TagOrientation.Horizontal
 
@@ -179,30 +185,82 @@ def place_pylon_tags(tag_type_id):
             pylon = report_string[4]
 
             # Если пилон уже имеет марку нужного нам типа, то пропускаем, размещать повторно не нужно
-            if already_has_mark(pylon, tag_type_id):
+            if already_has_mark(pylon):
                 report_string[3] = '<Уже размещена>'
                 continue
 
-            try:
-                pylon_ref = Reference(pylon)
-                pylon_mid = pylon.Location.Point
+            pylon_ref = Reference(pylon)
+            pylon_mid = pylon.Location.Point
 
-                leader_point = pylon_mid + XYZ(5.0, 5.0, 0.0)
-                pylon_tag = IndependentTag.Create(doc, active_view.Id, pylon_ref, True, tag_mode, tag_orientation, leader_point)
+            leader_point = pylon_mid + XYZ(5.0, 5.0, 0.0)
+            pylon_tag = IndependentTag.Create(doc, active_view.Id, pylon_ref, True, tag_mode, tag_orientation, leader_point)
 
-                pylon_tag.LeaderEndCondition = LeaderEndCondition.Free
-                elbow_point = pylon_tag.LeaderEnd + tag_elbow_offset
-                pylon_tag.LeaderElbow = elbow_point
+            pylon_tag.LeaderEndCondition = LeaderEndCondition.Free
+            elbow_point = pylon_tag.LeaderEnd + tag_elbow_offset
+            pylon_tag.LeaderElbow = elbow_point
 
-                header_point = elbow_point + tag_header_offset
-                pylon_tag.TagHeadPosition = header_point
+            header_point = elbow_point + tag_header_offset
+            pylon_tag.TagHeadPosition = header_point
 
+            # Если типоразмеры с нужными именами найдены, то получаем нужный по длине текста типоразмер марки
+            # Смысл в том, чтобы найти такую марку, которая будет умещать текст (берется из параметра пилона),
+            # но при этом быть минимальной по длине, чтобы не занимать линиями место на чертеже
+            if tag_symbols_dict.keys():
+                tag_type_id = get_needed_tag_type_id(pylon_tag)
                 if tag_type_id is not None:
                     pylon_tag.ChangeTypeId(tag_type_id)
 
-                report_string[3] = output.linkify(pylon_tag.Id)
+            report_string[3] = output.linkify(pylon_tag.Id)
+            try:
+                pass
             except:
                 report_string[3] = '<Не размещена>'
+
+
+def already_has_mark(pylon):
+    """
+    Если пилон уже имеет марку на текущем виде, имя типа которой начинается с tag_symbol_name_prefix
+    и заканчивается tag_symbol_name_suffix, то будем считать, что марка уже стоит и ставить ее не нужно
+    """
+    element_class_filter = ElementClassFilter(IndependentTag)
+    pylon_tag_ids = pylon.GetDependentElements(element_class_filter)
+
+    for pylon_tag_id in pylon_tag_ids:
+        existing_pylon_tag = doc.GetElement(pylon_tag_id)
+        existing_pylon_tag_symbol_name = existing_pylon_tag.Name
+        if (existing_pylon_tag.OwnerViewId == active_view.Id and
+                existing_pylon_tag_symbol_name.startswith(tag_symbol_name_prefix) and
+                existing_pylon_tag_symbol_name.endswith(tag_symbol_name_suffix)):
+            return True
+    return False
+
+
+def get_needed_tag_type_id(pylon_tag):
+    # Запоминаем какое было значение
+    temp_has_leader = pylon_tag.HasLeader
+    # Выключаем указатель марки и регеним документ, чтобы марка перерисовалась
+    pylon_tag.HasLeader = False
+    doc.Regenerate()
+
+    # Получаем ширину марки без выноски - только текстовое поле
+    bounding_box = pylon_tag.get_BoundingBox(doc.ActiveView)
+    bounding_box_max = bounding_box.Max
+    bounding_box_min = bounding_box.Min
+    length = float(convert_to_int_from_internal_value(bounding_box_max.X - bounding_box_min.X, UnitTypeId.Millimeters))
+
+    # Определяем ближайшее большее значение из имеющихся в типоразмерах
+    global tag_symbols_dict
+    sorted_keys = sorted(tag_symbols_dict.keys())
+    closest_length = min(sorted_keys, key=lambda x: abs(x-length)) if tag_symbols_dict.keys() else None
+
+    if closest_length < length:
+        index = sorted_keys.index(closest_length) + 1
+        if index < len(sorted_keys):
+            closest_length = sorted_keys[index]
+
+    pylon_tag.HasLeader = temp_has_leader
+    return tag_symbols_dict[closest_length].Id
+
 
 
 @notification()
@@ -225,7 +283,10 @@ def script_execute(plugin_logger):
     pylon_and_data_pairs = get_pylon_data(pylons)
     print("⠀")
     write_pylon_data(pylon_and_data_pairs)
+    print("Запись параметра \"Марка\" произведена!")
+    print("⠀")
 
+    get_pylon_tag_types()
     pylon_markings()
 
     '''
