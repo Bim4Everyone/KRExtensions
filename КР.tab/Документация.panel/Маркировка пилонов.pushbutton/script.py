@@ -48,7 +48,12 @@ tag_header_offset = XYZ(3.5, 0.0, 0.0)
 
 report_about_write = []
 
+
 def get_pylons():
+    """
+    Получает элементы пилонов среди тех элементов, что были выделены пользователем перед запуском плагина
+    :return: Список пилонов
+    """
     selected_ids = uidoc.Selection.GetElementIds()
 
     if len(selected_ids) == 0:
@@ -68,10 +73,21 @@ def get_pylons():
 
 
 def convert_to_int_from_internal_value(value, unit_type):
+    """
+    Конвертирует значение из встроенного формата в целочисленное заданного типа
+    :param value: значение во встроенном формате Revit
+    :param unit_type: ForgeTypeId типа значения, в который нужно перевести данные
+    :return: сконвертированнное в заданный тип значение
+    """
     return int(round(UnitUtils.ConvertFromInternalUnits(value, unit_type)))
 
 
 def get_waterproofing(pylon):
+    """
+    Получает значение суффикса для марки пилона в зависимости от наличия добавок в его бетоне
+    :param pylon: элемент пилона
+    :return: суффикс для марки пилона
+    """
     waterproofing = ''
     for material_id in pylon.GetMaterialIds(False):
         material = doc.GetElement(material_id)
@@ -82,6 +98,11 @@ def get_waterproofing(pylon):
 
 
 def get_pylon_data(pylons):
+    """
+    Получает значение марки в соответствии со значениями его параметров
+    :param pylons: список пилонов
+    :return: список пар пилон - значение для записи в его параметр Марка
+    """
     pylon_and_data_pairs = []
     for pylon in pylons:
         try:
@@ -116,6 +137,10 @@ def get_pylon_data(pylons):
 
 
 def write_pylon_data(pylon_and_data_pairs):
+    """
+    Записывает значение в параметр Марка у пилона
+    :param pylon_and_data_pairs: список пар пилон - значение для записи в его параметр Марка
+    """
     with revit.Transaction("КР: Маркировка пилонов"):
         for pair_for_write in pylon_and_data_pairs:
             pylon = pair_for_write[0]
@@ -129,12 +154,15 @@ def write_pylon_data(pylon_and_data_pairs):
 
 
 def get_pylon_tag_types():
+    """
+    Заполняет словарь, где ключ - длина подчеркнутой части марки, значение - типоразмера марки.
+    """
     print('Выполняем поиск семейства марки несущих колонн \"{0}\".'.format(tag_family_name))
     families = FilteredElementCollector(doc).OfCategory(BuiltInCategory.INVALID).OfClass(Family)
 
     tag_family = None
     for family in families:
-        if family.Name.Contains(tag_family_name):
+        if family.Name.Equals(tag_family_name):
             tag_family = family
             break
 
@@ -169,6 +197,9 @@ def get_pylon_tag_types():
 
 
 def pylon_markings():
+    """
+    Проверяет, что активный вид - вид в плане. Если да - запускает расстановку марок
+    """
     if active_view.ViewType == ViewType.FloorPlan or active_view.ViewType == ViewType.EngineeringPlan:
         place_pylon_tags()
         print('Выполняем размещение марок пилонов.')
@@ -177,6 +208,9 @@ def pylon_markings():
 
 
 def place_pylon_tags():
+    """
+    Размещает марки пилонов на активном виде. Назначает типоразмер марки в зависимости от длины текста марки
+    """
     tag_mode = TagMode.TM_ADDBY_CATEGORY
     tag_orientation = TagOrientation.Horizontal
 
@@ -236,6 +270,11 @@ def already_has_mark(pylon):
 
 
 def get_needed_tag_type_id(pylon_tag):
+    """
+    Получает id типоразмера марки пилона в зависимости от длины текста марки
+    :param pylon_tag: марка пилона
+    :return: id типоразмера марки пилона
+    """
     # Запоминаем какое было значение
     temp_has_leader = pylon_tag.HasLeader
     # Выключаем указатель марки и регеним документ, чтобы марка перерисовалась
@@ -271,10 +310,12 @@ def script_execute(plugin_logger):
     print("- \"ФОП_РАЗМ_Ширина\"")
     print("- \"ФОП_РАЗМ_Высота\"")
     print("- \"обр_ФОП_АРМ_Пилон\"")
+    print("- <Имя материала> (на наличие строки \"Бетон с Пенетроном\")")
 
-    print("Запись будет производиться в параметр \"Марка\".")
+    print("Запись будет производиться в параметр \"Марка\". Пример записи: \"18.35.40-35ф24-д\"")
 
-    print("Из всех выбранных элементов будут отобраны только те, что имеют имя типа со словом \"Пилон\".")
+    print("Из всех выбранных элементов будут отобраны только те, что имеют категорию \"Несущие колонны\" "
+          "и имя типа со словом \"Пилон\".")
     print("Например, \"НН_Пилон-350х1800 (ЖБ B40 F150 W6)\".")
 
     pylons = get_pylons()
