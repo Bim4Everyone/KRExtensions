@@ -33,7 +33,7 @@ output = script.output.get_output()
 param_name_for_length = 'ФОП_РАЗМ_Длина'
 param_name_for_width = 'ФОП_РАЗМ_Ширина'
 param_name_for_height = 'ФОП_РАЗМ_Высота'
-param_name_for_reinforcement = 'обр_ФОП_АРМ_Пилон'
+param_name_for_reinforcement = 'ТЗА_Характеристики'
 param_name_for_write = 'Марка'
 
 tag_family_name = '!Марка_Несущая колонны'
