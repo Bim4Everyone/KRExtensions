@@ -3,8 +3,19 @@ title:
   en_us: "Pylon\nmarkings"
 
 tooltip:
-  ru: Выполняет маркировку выбранных пилонов в соответствии с их размерами и выбранным армированием.
-  en_us: Performs marking of selected pylons according to their dimensions and selected reinforcement.
+  ru: >- 
+    Заполняет параметр "Марка" у пилонов по значениям габаритов опалубочной модели, типа заданного армирования 
+    и имени материала пилона (например, "18.35.40-35ф24-д"). Если активный вид перед запуском плагина был планом, 
+    то плагин также разместит марки пилонов на данном виде.
+    
+    Перед запуском выберите пилоны для работы на плане.
+
+  en_us: >-
+    Fills in the "Mark" parameter for pylons based on the formwork model dimensions, 
+    the type of specified reinforcement, and the pylon material name (e.g. "18.35.40-35ф24-д"). 
+    If the active view before launching the plugin was a plan, the plugin will also place pylon marks on this view.
+    
+    Before launching, select pylons to work on the plan.
 
 author: DivinN
 help_url: "https://kb.a101.ru/pages/viewpage.action?pageId=145326192"
