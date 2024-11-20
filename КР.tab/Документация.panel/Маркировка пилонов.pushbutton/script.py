@@ -30,6 +30,15 @@ app = doc.Application
 active_view = doc.ActiveView
 output = script.output.get_output()
 
+struct_columns_category_id = Category.GetCategory(doc, BuiltInCategory.OST_StructuralColumns).Id
+'''Id категории "Несущие колонны" для фильтрации нужных элементов'''
+
+pylon_type_name_keyword = 'Пилон'
+'''Ключевое слово в имени типа элемента для фильтрации нужных элементов'''
+
+material_with_waterproofing_name = 'Бетон с Пенетроном'
+'''Фрагмент имени материала,указывающий на то, что в бетоне будут присутствовать гидрофобные добавки'''
+
 param_name_for_length = 'ФОП_РАЗМ_Длина'
 param_name_for_width = 'ФОП_РАЗМ_Ширина'
 param_name_for_height = 'ФОП_РАЗМ_Высота'
@@ -37,7 +46,6 @@ param_name_for_reinforcement = 'ТЗА_Характеристики'
 param_name_for_write = 'Марка'
 
 tag_family_name = '!Марка_Несущая колонны'
-# tag_type_name = 'Марка_Полка 20 мм'
 
 tag_symbols_dict = {}
 tag_symbol_name_prefix = 'Марка_Полка '
@@ -63,7 +71,7 @@ def get_pylons():
 
     elements = [doc.GetElement(selectedId) for selectedId in selected_ids]
     pylons = [elem for elem in elements
-              if elem.Category.Name.Contains('Несущие колонны') and elem.Name.Contains('Пилон')]
+              if elem.Category.Id == struct_columns_category_id and elem.Name.Contains(pylon_type_name_keyword)]
 
     if len(pylons) == 0:
         global output
@@ -91,7 +99,7 @@ def get_waterproofing(pylon):
     waterproofing = ''
     for material_id in pylon.GetMaterialIds(False):
         material = doc.GetElement(material_id)
-        if material.Name.Contains('Бетон с Пенетроном'):
+        if material.Name.Contains(material_with_waterproofing_name):
             waterproofing = '-д'
             break
     return waterproofing
@@ -141,15 +149,15 @@ def write_pylon_data(pylon_and_data_pairs):
     Записывает значение в параметр Марка у пилона
     :param pylon_and_data_pairs: список пар пилон - значение для записи в его параметр Марка
     """
-    with revit.Transaction("КР: Маркировка пилонов"):
+    with revit.Transaction("BIM: Маркировка пилонов"):
         for pair_for_write in pylon_and_data_pairs:
             pylon = pair_for_write[0]
             string_for_write = pair_for_write[1]
             try:
-                pylon.GetParam(param_name_for_write).Set(string_for_write)
+                pylon.SetParamValue(param_name_for_write, string_for_write)
                 report_about_write.append([pylon.Name, output.linkify(pylon.Id), string_for_write, '', pylon])
             except:
-                error = "Не удалось записать значение у пилона с id: " + str(pylon.Id)
+                error = "Не удалось записать значение у пилона"
                 report_about_write.append([pylon.Name, output.linkify(pylon.Id), error, '', pylon])
 
 
@@ -158,7 +166,7 @@ def get_pylon_tag_types():
     Заполняет словарь, где ключ - длина подчеркнутой части марки, значение - типоразмера марки.
     """
     print('Выполняем поиск семейства марки несущих колонн \"{0}\".'.format(tag_family_name))
-    families = FilteredElementCollector(doc).OfCategory(BuiltInCategory.INVALID).OfClass(Family)
+    families = FilteredElementCollector(doc).OfClass(Family)
 
     tag_family = None
     for family in families:
@@ -176,7 +184,7 @@ def get_pylon_tag_types():
 
     for symbol_id in tag_family.GetFamilySymbolIds():
         tag_symbol = doc.GetElement(symbol_id)
-        tag_symbol_name = tag_symbol.get_Parameter(BuiltInParameter.SYMBOL_NAME_PARAM).AsString()
+        tag_symbol_name = str(tag_symbol.GetParamValue(BuiltInParameter.SYMBOL_NAME_PARAM))
 
         if tag_symbol_name.startswith(tag_symbol_name_prefix) and tag_symbol_name.endswith(tag_symbol_name_suffix):
             try:
@@ -189,7 +197,7 @@ def get_pylon_tag_types():
     if tag_symbols_dict.keys():
         print("Подходящие типоразмеры марки найдены:")
         for tag_symbol in tag_symbols_dict.values():
-            tag_symbol_name = tag_symbol.get_Parameter(BuiltInParameter.SYMBOL_NAME_PARAM).AsString()
+            tag_symbol_name = str(tag_symbol.GetParamValue(BuiltInParameter.SYMBOL_NAME_PARAM))
             print('- \"{0}\"'.format(tag_symbol_name))
     else:
         print("Не найдены необходимые типоразмеры в семейство марки \"{0}\", размещать будем стандартную."
@@ -214,39 +222,38 @@ def place_pylon_tags():
     tag_mode = TagMode.TM_ADDBY_CATEGORY
     tag_orientation = TagOrientation.Horizontal
 
-    with revit.Transaction("КР: Размещение марок пилонов"):
+    with revit.Transaction("BIM: Размещение марок пилонов"):
         for report_string in report_about_write:
-            pylon = report_string[4]
-
-            # Если пилон уже имеет марку нужного нам типа, то пропускаем, размещать повторно не нужно
-            if already_has_mark(pylon):
-                report_string[3] = '<Уже размещена>'
-                continue
-
-            pylon_ref = Reference(pylon)
-            pylon_mid = pylon.Location.Point
-
-            leader_point = pylon_mid + XYZ(5.0, 5.0, 0.0)
-            pylon_tag = IndependentTag.Create(doc, active_view.Id, pylon_ref, True, tag_mode, tag_orientation, leader_point)
-
-            pylon_tag.LeaderEndCondition = LeaderEndCondition.Free
-            elbow_point = pylon_tag.LeaderEnd + tag_elbow_offset
-            pylon_tag.LeaderElbow = elbow_point
-
-            header_point = elbow_point + tag_header_offset
-            pylon_tag.TagHeadPosition = header_point
-
-            # Если типоразмеры с нужными именами найдены, то получаем нужный по длине текста типоразмер марки
-            # Смысл в том, чтобы найти такую марку, которая будет умещать текст (берется из параметра пилона),
-            # но при этом быть минимальной по длине, чтобы не занимать линиями место на чертеже
-            if tag_symbols_dict.keys():
-                tag_type_id = get_needed_tag_type_id(pylon_tag)
-                if tag_type_id is not None:
-                    pylon_tag.ChangeTypeId(tag_type_id)
-
-            report_string[3] = output.linkify(pylon_tag.Id)
             try:
-                pass
+                pylon = report_string[4]
+
+                # Если пилон уже имеет марку нужного нам типа, то пропускаем, размещать повторно не нужно
+                if already_has_mark(pylon):
+                    report_string[3] = '<Уже размещена>'
+                    continue
+
+                pylon_ref = Reference(pylon)
+                pylon_mid = pylon.Location.Point
+
+                leader_point = pylon_mid + XYZ(5.0, 5.0, 0.0)
+                pylon_tag = IndependentTag.Create(doc, active_view.Id, pylon_ref, True, tag_mode, tag_orientation, leader_point)
+
+                pylon_tag.LeaderEndCondition = LeaderEndCondition.Free
+                elbow_point = pylon_tag.LeaderEnd + tag_elbow_offset
+                pylon_tag.LeaderElbow = elbow_point
+
+                header_point = elbow_point + tag_header_offset
+                pylon_tag.TagHeadPosition = header_point
+
+                # Если типоразмеры с нужными именами найдены, то получаем нужный по длине текста типоразмер марки
+                # Смысл в том, чтобы найти такую марку, которая будет умещать текст (берется из параметра пилона),
+                # но при этом быть минимальной по длине, чтобы не занимать линиями место на чертеже
+                if tag_symbols_dict.keys():
+                    tag_type_id = get_needed_tag_type_id(pylon_tag)
+                    if tag_type_id is not None:
+                        pylon_tag.ChangeTypeId(tag_type_id)
+
+                report_string[3] = output.linkify(pylon_tag.Id)
             except:
                 report_string[3] = '<Не размещена>'
 
@@ -279,6 +286,15 @@ def get_needed_tag_type_id(pylon_tag):
     temp_has_leader = pylon_tag.HasLeader
     # Выключаем указатель марки и регеним документ, чтобы марка перерисовалась
     pylon_tag.HasLeader = False
+    '''
+    Задача - получить типоразмер марки, который наилучшим образом подходит для нее (чтобы линия под текстом была самой 
+    короткой, но при этом подчеркивала весь текст). 
+    Для этого необходимо отключить линию выноски, получить размеры оставшейся марки по ширине, 
+    подобрать из существующих типоразмеров нужный, вернуть линию выноски.
+    Мы изменили свойство объекта в Revit, и далее будем при помощи BoundingBox узнавать его размеры
+    Однако BoundingBox будет строиться вокруг визуального представления объекта, а оно осталось прежним
+    Визуальное представление объекта можно обновить при помощи метода doc.Regenerate()
+    '''
     doc.Regenerate()
 
     # Получаем ширину марки без выноски - только текстовое поле
