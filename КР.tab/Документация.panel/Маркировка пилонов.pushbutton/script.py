@@ -30,7 +30,7 @@ app = doc.Application
 active_view = doc.ActiveView
 output = script.output.get_output()
 
-struct_columns_category_id = Category.GetCategory(doc, BuiltInCategory.OST_StructuralColumns).Id
+struct_columns_category_id = ElementId(BuiltInCategory.OST_StructuralColumns)
 '''Id категории "Несущие колонны" для фильтрации нужных элементов'''
 
 pylon_type_name_keyword = 'Пилон'
@@ -184,7 +184,7 @@ def get_pylon_tag_types():
 
     for symbol_id in tag_family.GetFamilySymbolIds():
         tag_symbol = doc.GetElement(symbol_id)
-        tag_symbol_name = str(tag_symbol.GetParamValue(BuiltInParameter.SYMBOL_NAME_PARAM))
+        tag_symbol_name = tag_symbol.GetParamValue(BuiltInParameter.SYMBOL_NAME_PARAM)
 
         if tag_symbol_name.startswith(tag_symbol_name_prefix) and tag_symbol_name.endswith(tag_symbol_name_suffix):
             try:
@@ -197,7 +197,7 @@ def get_pylon_tag_types():
     if tag_symbols_dict.keys():
         print("Подходящие типоразмеры марки найдены:")
         for tag_symbol in tag_symbols_dict.values():
-            tag_symbol_name = str(tag_symbol.GetParamValue(BuiltInParameter.SYMBOL_NAME_PARAM))
+            tag_symbol_name = tag_symbol.GetParamValue(BuiltInParameter.SYMBOL_NAME_PARAM)
             print('- \"{0}\"'.format(tag_symbol_name))
     else:
         print("Не найдены необходимые типоразмеры в семейство марки \"{0}\", размещать будем стандартную."
