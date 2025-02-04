@@ -19,6 +19,7 @@ assembly: RevitKrChecker.dll
 command_class: RevitKrCheckerCommand
 
 author: DivinN
+help_url: "https://kb.a101.ru/pages/viewpage.action?pageId=145330153"
 
 min_revit_version: 2022
 max_revit_version: 2024
