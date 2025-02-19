@@ -1,0 +1,25 @@
+title:
+  ru: Проверить модель
+  en_us: Check model
+
+tooltip:
+  ru: >-
+    Выполняет проверку элементов модели по заданным правилам, выводит отчет.
+    Для использования плагина нажмите на кнопку запуска, выберите способ отбора элементов - с вида или с проекта, 
+    проанализируйте отчет о проверке. При необходимости вы можете внести изменения в элементы модели, а затем нажать
+    кнопку Перепроверить, чтобы плагин снова проверил отобранные элементы.
+
+  en_us: >- 
+    Performs a check of model elements according to the specified rules, outputs a report. To use the plugin, 
+    click the start button, select the method of selecting elements - from the view or from the project, 
+    analyze the check report. If necessary, you can make changes to the model elements, and then click 
+    the Recheck button so that the plugin checks the selected elements again.
+
+assembly: RevitKrChecker.dll
+command_class: RevitKrCheckerCommand
+
+author: DivinN
+help_url: "https://kb.a101.ru/pages/viewpage.action?pageId=145330153"
+
+min_revit_version: 2022
+max_revit_version: 2024
