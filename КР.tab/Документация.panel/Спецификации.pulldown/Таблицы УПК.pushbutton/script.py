@@ -306,8 +306,7 @@ class RevitRepository:
     def __get_concrete_by_table_type(self):
         categories_id = [x.Id for x in self.categories]
         filtered_concrete = [x for x in self.__concrete if x.Category.Id in categories_id]
-        elems_filtered_by_type = self.__filter_by_type(filtered_concrete)
-        self.__concrete_by_table_type = self.__filter_by_group(elems_filtered_by_type)
+        self.__concrete_by_table_type = self.__filter_by_group(filtered_concrete)
 
     def get_filtered_concrete_by_user(self, buildings, constr_sections):
         buildings = [x.text_value for x in buildings]
@@ -393,7 +392,7 @@ class RevitRepository:
         # Была найдена проблема при создании таблицы в окне отчета об ошибках, которая создается
         # при помощи функции print_table() из библиотеки pyRevit. Таблица не создается при определенных условиях,
         # при этом не возникает никаких ошибок. Условия, при которых возникает проблема, связаны с количеством строк
-        # и количеством символов в двух соседних ячейках одной строки. Например таблица не отображалась при 2 строках данных
+        # и количеством символов в двух соседних ячейках одной строки. Например, таблица не отображалась при 2 строках данных
         # и наличии в двух соседних ячейках текста количеством 17 символов (цифры) и 52 символа (буквы русского алфавита).
         # Проблема также наблюдается при написании текста английского алфавита при в 2 раза меньшем количестве символов.
         # Наблюдались и другие комбинации количество строк/символов, которые приводят к проблеме.
@@ -402,11 +401,11 @@ class RevitRepository:
         # Markdown и затем передает ее в функцию print_md() библиотеки pyRevit. В ней при помощи библиотеки Markdown строка преобразуется
         # в код HTML. При этом в функцию передается расширение, являющееся дополнительным конфигуратором данных для формирования
         # таблицы. Данное расширение создано на основе того, что представлено в стандартной библиотеке Markdown, но отчасти изменено.
-        # Помимо этого в print_md() выполняеются дополнительные преобразования кода для корректности отображения в браузере
+        # Помимо этого в print_md() выполняются дополнительные преобразования кода для корректности отображения в браузере
         # и в конце происходит печать print(html_code, end="").
         # На каждом этапе получаемая строка/html-код были проверены и ошибок найдено не было, исходя из этого пришли к выводу,
         # что проблема возникает в момент отображения html-кода во встроенном браузере окна от pyRevit.
-        # Т.к. доступа для редактирования окна не имели приняли решения воспользоваться заглушкой в виде добавления в конец таблицы
+        # Т.к. доступа для редактирования окна не имели, приняли решения воспользоваться заглушкой в виде добавления в конец таблицы
         # дополнительной строки, содержащей в каждой ячейке "_", которая показала свою эффективность.
 
         missing_parameters.append(["_", "_", "_", "_"])
@@ -841,6 +840,7 @@ class QualityTable:
             self.update_schedule_name(schedule)
         new_schedule = self.create_new_schedule(self.table_width)
         self.set_schedule_row_values(new_schedule)
+        return new_schedule
 
     def find_schedule(self):
         schedules = FilteredElementCollector(doc).OfClass(ViewSchedule)
@@ -1005,7 +1005,8 @@ class CreateQualityTableCommand(ICommand):
             selected_table_type = self.__view_model.selected_table_type
             construction = Construction(selected_table_type, concrete, rebar)
             quality_table = QualityTable(selected_table_type, construction, selected_blds, selected_sctns)
-            quality_table.create_table()
+            new_schedule = quality_table.create_table()
+            uidoc.ActiveView = new_schedule
         return True
 
 
