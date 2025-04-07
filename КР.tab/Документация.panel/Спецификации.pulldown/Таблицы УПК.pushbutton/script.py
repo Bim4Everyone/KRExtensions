@@ -1144,52 +1144,52 @@ def script_execute(plugin_logger):
     ordinary_walls_table_type = TableType("Стены рядовые")
     ordinary_walls_table_type.categories = [walls_cat]
     ordinary_walls_table_type.type_key_word = ["Стена"]
-    ordinary_walls_table_type.concrete_group = ["Стены_Ряд"]
+    ordinary_walls_table_type.concrete_group = ["Стены_Рядовые"]
     ordinary_walls_table_type.indexes_info = [
         QualityIndex("Этажность здания, тип секции", "1"),
         QualityIndex("Толщина стен, мм", "2"),
         QualityIndex("Класс бетона", "3"),
         QualityIndex("Объем бетона, м3", "4"),
-        QualityIndex("Масса вертикальной арматуры, кг", "5.1", "mass", ["Стены_Ряд_Вертикальная"]),
-        QualityIndex("Расход вертикальной арматуры, кг/м3", "5.2", "consumption", ["Стены_Ряд_Вертикальная"]),
-        QualityIndex("Масса горизонтальной арматуры, кг", "6.1", "mass", ["Стены_Ряд_Горизонтальная"]),
-        QualityIndex("Расход горизонтальной арматуры, кг/м3", "6.2", "consumption", ["Стены_Ряд_Горизонтальная"]),
-        QualityIndex("Масса конструктивной арматуры, кг", "7.1", "mass", ["Стены_Ряд_Конструктивная"]),
-        QualityIndex("Расход конструктивной арматуры, кг/м3", "7.2", "consumption", ["Стены_Ряд_Конструктивная"]),
+        QualityIndex("Масса вертикальной арматуры, кг", "5.1", "mass", ["Стены_Рядовые_Вертикальная"]),
+        QualityIndex("Расход вертикальной арматуры, кг/м3", "5.2", "consumption", ["Стены_Рядовые_Вертикальная"]),
+        QualityIndex("Масса горизонтальной арматуры, кг", "6.1", "mass", ["Стены_Рядовые_Горизонтальная"]),
+        QualityIndex("Расход горизонтальной арматуры, кг/м3", "6.2", "consumption", ["Стены_Рядовые_Горизонтальная"]),
+        QualityIndex("Масса конструктивной арматуры, кг", "7.1", "mass", ["Стены_Рядовые_Конструктивная"]),
+        QualityIndex("Расход конструктивной арматуры, кг/м3", "7.2", "consumption", ["Стены_Рядовые_Конструктивная"]),
         QualityIndex("Общий расход, кг/м3", "8")]
 
     retaining_walls_table_type = TableType("Стены подпорные")
     retaining_walls_table_type.categories = [walls_cat]
     retaining_walls_table_type.type_key_word = ["Стена"]
-    retaining_walls_table_type.concrete_group = ["Стены_Подп"]
+    retaining_walls_table_type.concrete_group = ["Стены_Подпорные"]
     retaining_walls_table_type.indexes_info = [
         QualityIndex("Этажность здания, тип секции", "1"),
         QualityIndex("Толщина стен, мм", "2"),
         QualityIndex("Класс бетона", "3"),
         QualityIndex("Объем бетона, м3", "4"),
-        QualityIndex("Масса вертикальной арматуры, кг", "5.1", "mass", ["Стены_Подп_Вертикальная"]),
-        QualityIndex("Расход вертикальной арматуры, кг/м3", "5.2", "consumption", ["Стены_Подп_Вертикальная"]),
-        QualityIndex("Масса горизонтальной арматуры, кг", "6.1", "mass", ["Стены_Подп_Горизонтальная"]),
-        QualityIndex("Расход горизонтальной арматуры, кг/м3", "6.2", "consumption", ["Стены_Подп_Горизонтальная"]),
-        QualityIndex("Масса конструктивной арматуры, кг", "7.1", "mass", ["Стены_Подп_Конструктивная"]),
-        QualityIndex("Расход конструктивной арматуры, кг/м3", "7.2", "consumption", ["Стены_Подп_Конструктивная"]),
+        QualityIndex("Масса вертикальной арматуры, кг", "5.1", "mass", ["Стены_Подпорные_Вертикальная"]),
+        QualityIndex("Расход вертикальной арматуры, кг/м3", "5.2", "consumption", ["Стены_Подпорные_Вертикальная"]),
+        QualityIndex("Масса горизонтальной арматуры, кг", "6.1", "mass", ["Стены_Подпорные_Горизонтальная"]),
+        QualityIndex("Расход горизонтальной арматуры, кг/м3", "6.2", "consumption", ["Стены_Подпорные_Горизонтальная"]),
+        QualityIndex("Масса конструктивной арматуры, кг", "7.1", "mass", ["Стены_Подпорные_Конструктивная"]),
+        QualityIndex("Расход конструктивной арматуры, кг/м3", "7.2", "consumption", ["Стены_Подпорные_Конструктивная"]),
         QualityIndex("Общий расход, кг/м3", "8")]
 
     parapet_walls_table_type = TableType("Парапеты")
     parapet_walls_table_type.categories = [walls_cat]
     parapet_walls_table_type.type_key_word = ["Парапет"]
-    parapet_walls_table_type.concrete_group = ["Парапет"]
+    parapet_walls_table_type.concrete_group = ["Парапеты"]
     parapet_walls_table_type.indexes_info = [
         QualityIndex("Этажность здания, тип секции", "1"),
         QualityIndex("Толщина стен, мм", "2"),
         QualityIndex("Класс бетона", "3"),
         QualityIndex("Объем бетона, м3", "4"),
-        QualityIndex("Масса вертикальной арматуры, кг", "5.1", "mass", ["Парапет_Вертикальная"]),
-        QualityIndex("Расход вертикальной арматуры, кг/м3", "5.2", "consumption", ["Парапет_Вертикальная"]),
-        QualityIndex("Масса горизонтальной арматуры, кг", "6.1", "mass", ["Парапет_Горизонтальная"]),
-        QualityIndex("Расход горизонтальной арматуры, кг/м3", "6.2", "consumption", ["Парапет_Горизонтальная"]),
-        QualityIndex("Масса конструктивной арматуры, кг", "7.1", "mass", ["Парапет_Конструктивная"]),
-        QualityIndex("Расход конструктивной арматуры, кг/м3", "7.2", "consumption", ["Парапет_Конструктивная"]),
+        QualityIndex("Масса вертикальной арматуры, кг", "5.1", "mass", ["Парапеты_Вертикальная"]),
+        QualityIndex("Расход вертикальной арматуры, кг/м3", "5.2", "consumption", ["Парапеты_Вертикальная"]),
+        QualityIndex("Масса горизонтальной арматуры, кг", "6.1", "mass", ["Парапеты_Горизонтальная"]),
+        QualityIndex("Расход горизонтальной арматуры, кг/м3", "6.2", "consumption", ["Парапеты_Горизонтальная"]),
+        QualityIndex("Масса конструктивной арматуры, кг", "7.1", "mass", ["Парапеты_Конструктивная"]),
+        QualityIndex("Расход конструктивной арматуры, кг/м3", "7.2", "consumption", ["Парапеты_Конструктивная"]),
         QualityIndex("Общий расход, кг/м3", "8")]
 
     pylon_table_type = TableType("Пилоны")
@@ -1219,7 +1219,7 @@ def script_execute(plugin_logger):
         QualityIndex("Объем бетона, м3", "4"),
         QualityIndex("Коэффициент суммарной площади сечений пилонов от площади перекрытия, ΣAw/Ap х 100", "5"),
         QualityIndex("Масса продольной арматуры, кг", "6.1", "mass", ["Колонны_Продольная"]),
-        QualityIndex("Расход продольной арматуры, кг/м3", "6.2", "consumption", ["ПКолонны_Продольная"]),
+        QualityIndex("Расход продольной арматуры, кг/м3", "6.2", "consumption", ["Колонны_Продольная"]),
         QualityIndex("Масса поперечной арматуры, кг", "7.1", "mass", ["Колонны_Поперечная"]),
         QualityIndex("Расход поперечной арматуры, кг/м3", "7.2", "consumption", ["Колонны_Поперечная"]),
         QualityIndex("Общий расход, кг/м3", "8")]
