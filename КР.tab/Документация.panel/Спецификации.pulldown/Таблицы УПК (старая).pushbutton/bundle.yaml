@@ -1,0 +1,19 @@
+title:
+  ru: Таблицы УПК (старая)
+  en_us: Tables of UQI (old)
+
+tooltip:
+  ru: Формирует таблицу показателей качества. 
+      Заполнение параметров для использования данной версии плагина необходимо производить в соответствии с Таблицей 4 
+      статьи, в которую можно перейти через F1. В случае, если вы хотите воспользоваться обновленной версией плагина, то
+      нажмите кнопку "Таблицы УПК" (без слова "старая").
+  en_us: Generates a table of quality indicators. 
+         Filling in the parameters for using this version of the plugin must be done in accordance with Table 4 
+         of the article, which can be accessed via F1. If you want to use the updated version of the plugin, 
+         click the "Tables of UQI" button (without "old").
+
+author: sssenya
+help_url: "https://kb.a101.ru/pages/viewpage.action?pageId=82626984"
+
+min_revit_version: 2020
+max_revit_version: 2024
