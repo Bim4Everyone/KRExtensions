@@ -1,10 +1,24 @@
 title:
   ru: Таблицы УПК
-  en_us: quality tables
+  en_us: Tables of UQI
 
 tooltip:
-  ru: Формирует таблицу показателей качества
-  en_us: Creates a quality table
+  ru: Формирует таблицу показателей качества. 
+      Заполнение параметров для использования данной версии плагина необходимо производить в соответствии с Таблицей 3 
+      статьи, в которую можно перейти через F1. В случае, если вы хотите воспользоваться старой версией плагина, то
+      нажмите кнопку "Таблицы УПК (старая)".
+  
+      К перечню изменений данной версии плагина относится - новая структура деления стен (Стены_ЛЛУ, Стены_Рядовые, 
+      Стены_Подпорные), добавлены таблицы для парапета и колонн, отключена фильтрация в таблицах по имени типа, 
+      спецификация будет открываться в Revit после создания.
+  en_us: Generates a table of quality indicators. 
+         Filling in the parameters for using this version of the plugin must be done in accordance with Table 3 
+         of the article, which can be accessed via F1. If you want to use the updated version of the plugin, 
+         click the "Tables of UQI (old)" button.
+  
+         The list of changes in this version of the plugin includes - a new structure for dividing walls, tables 
+         for parapets and columns have been added, filtering in tables by type name has been disabled, 
+         the specification will open in Revit after creation.
 
 author: sssenya
 help_url: "https://kb.a101.ru/pages/viewpage.action?pageId=82626984"
