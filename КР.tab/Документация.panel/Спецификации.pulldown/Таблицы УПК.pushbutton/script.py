@@ -90,26 +90,28 @@ class RevitRepository:
 
     def check_exist_main_parameters(self):
         self.__errors_dict = dict()
-        common_parameters = [SECTION_NUMBER,
-                             BUILDING_NUMBER,
+        common_parameters = [BUILDING_NUMBER,
+                             SECTION_NUMBER,
                              FILTRATION_1,
-                             FILTRATION_2]
-        concrete_inst_parameters = [VOLUME]
-        rebar_inst_type_parameters = [FORM_NUMBER]
-        concrete_common_parameters = common_parameters + concrete_inst_parameters
+                             FILTRATION_2,
+                             CONSTR_GROUP]
+        #concrete_inst_parameters = [VOLUME]
+        #rebar_inst_type_parameters = [FORM_NUMBER]
+        #concrete_common_parameters = common_parameters + concrete_inst_parameters
 
         for element in self.__rebar:
-            element_type = self.doc.GetElement(element.GetTypeId())
+            #element_type = self.doc.GetElement(element.GetTypeId())
             for parameter_name in common_parameters:
                 if not element.IsExistsParam(parameter_name):
                     self.__add_error("Арматура___Отсутствует параметр у экземпляра___", element, parameter_name)
 
-            for parameter_name in rebar_inst_type_parameters:
-                if not element.IsExistsParam(parameter_name) and not element_type.IsExistsParam(parameter_name):
-                    self.__add_error("Арматура___Отсутствует параметр у экземпляра или типоразмера___", element, parameter_name)
+            #for parameter_name in rebar_inst_type_parameters:
+            #    if not element.IsExistsParam(parameter_name) and not element_type.IsExistsParam(parameter_name):
+            #        self.__add_error("Арматура___Отсутствует параметр у экземпляра или типоразмера___", element, parameter_name)
 
         for element in self.__concrete:
-            for parameter_name in concrete_common_parameters:
+            #for parameter_name in concrete_common_parameters:
+            for parameter_name in common_parameters:
                 if not element.IsExistsParam(parameter_name):
                     self.__add_error("Железобетон___Отсутствует параметр у экземпляра___", element, parameter_name)
 
@@ -117,10 +119,36 @@ class RevitRepository:
             missing_parameters = self.__create_error_list(self.__errors_dict)
             return missing_parameters
 
-    def check_exist_rebar_parameters(self):
+    def check_exist_concrete_volume_parameter(self, concrete):
         self.__errors_dict = dict()
-        rebar_inst_parameters = [CONSTR_GROUP,
-                                 AMOUNT_ON_LEVEL,
+        concrete_inst_parameters = [VOLUME]
+
+        for element in concrete:
+            for parameter_name in concrete_inst_parameters:
+                if not element.IsExistsParam(parameter_name):
+                    self.__add_error("Железобетон___Отсутствует параметр у экземпляра___", element, parameter_name)
+
+        if self.__errors_dict:
+            missing_parameters = self.__create_error_list(self.__errors_dict)
+            return missing_parameters
+
+    def check_exist_rebar_form_number_parameter(self, rebar):
+        self.__errors_dict = dict()
+        rebar_inst_type_parameters = [FORM_NUMBER]
+
+        for element in rebar:
+            element_type = self.doc.GetElement(element.GetTypeId())
+            for parameter_name in rebar_inst_type_parameters:
+               if not element.IsExistsParam(parameter_name) and not element_type.IsExistsParam(parameter_name):
+                   self.__add_error("Арматура___Отсутствует параметр у экземпляра или типоразмера___", element, parameter_name)
+
+        if self.__errors_dict:
+            missing_parameters = self.__create_error_list(self.__errors_dict)
+            return missing_parameters
+
+    def check_exist_rebar_parameters(self, rebar):
+        self.__errors_dict = dict()
+        rebar_inst_parameters = [AMOUNT_ON_LEVEL,
                                  AMOUNT_OF_LEVELS]
         rebar_uniform_length_parameter = [REBAR_LENGTH]
         rebar_vary_length_parameter = [ROD_LENGTH]
@@ -129,7 +157,7 @@ class RevitRepository:
                                       REBAR_CALC_METERS]
         rebar_inst_type_by_number_parameters = [REBAR_MASS_PER_LENGTH]
 
-        for element in self.__rebar:
+        for element in rebar:
             element_type = self.doc.GetElement(element.GetTypeId())
             for parameter_name in rebar_inst_parameters:
                 if not element.IsExistsParam(parameter_name):
@@ -174,10 +202,11 @@ class RevitRepository:
             missing_parameters = self.__create_error_list(self.__errors_dict)
             return missing_parameters
 
-    def check_parameters_values(self):
+    def check_rebar_parameters_values(self, rebar):
         self.__errors_dict = dict()
-        concrete_inst_parameters = [VOLUME]
-        rebar_inst_parameters = [AMOUNT_ON_LEVEL,
+        # concrete_inst_parameters = [VOLUME]
+        rebar_inst_parameters = [CONSTR_GROUP,
+                                 AMOUNT_ON_LEVEL,
                                  AMOUNT_OF_LEVELS]
         rebar_uniform_length_parameter = [REBAR_LENGTH]
         rebar_vary_length_parameter = [ROD_LENGTH]
@@ -185,7 +214,7 @@ class RevitRepository:
         rebar_inst_type_diameter_parameters = [REBAR_DIAMETER]
         rebar_inst_type_by_number_parameters = [REBAR_MASS_PER_LENGTH]
 
-        for element in self.__rebar:
+        for element in rebar:
             element_type = self.doc.GetElement(element.GetTypeId())
             for parameter_name in rebar_inst_parameters:
                 if not element.GetParam(parameter_name).HasValue or element.GetParamValue(parameter_name) == None:
@@ -250,10 +279,10 @@ class RevitRepository:
                 if not element.GetParam(AMOUNT).HasValue:
                     self.__add_error("Арматура___Отсутствует значение у параметра___", element, AMOUNT)
 
-        for element in self.__concrete:
-            for parameter_name in concrete_inst_parameters:
-                if element.GetParamValue(parameter_name) == 0:
-                    self.__add_error("Железобетон___Отсутствует значение у параметра___", element, parameter_name)
+        # for element in self.__concrete:
+        #     for parameter_name in concrete_inst_parameters:
+        #         if element.GetParamValue(parameter_name) == 0:
+        #             self.__add_error("Железобетон___Отсутствует значение у параметра___", element, parameter_name)
 
         if self.__errors_dict:
             empty_parameters = self.__create_error_list(self.__errors_dict)
@@ -261,28 +290,41 @@ class RevitRepository:
 
 
 
-    def check_filtered_rebar(self, rebar):
-        self.__errors_dict = dict()
-        rebar_inst_parameters = [CONSTR_GROUP]
+    # def check_filtered_rebar(self, rebar):
+    #     self.__errors_dict = dict()
+    #     rebar_inst_parameters = [CONSTR_GROUP]
+    #
+    #     for element in rebar:
+    #         for parameter_name in rebar_inst_parameters:
+    #             if not element.GetParam(parameter_name).HasValue or element.GetParamValue(parameter_name) == None:
+    #                 self.__add_error("Арматура___Отсутствует значение у параметра___", element, parameter_name)
+    #
+    #     if self.__errors_dict:
+    #         empty_parameters = self.__create_error_list(self.__errors_dict)
+    #         return empty_parameters
 
-        for element in rebar:
-            for parameter_name in rebar_inst_parameters:
-                if not element.GetParam(parameter_name).HasValue or element.GetParamValue(parameter_name) == None:
-                    self.__add_error("Арматура___Отсутствует значение у параметра___", element, parameter_name)
+    # def filter_by_main_parameters(self):
+    #     filter_value = "Исключить из показателей качества"
+    #
+    #     self.__rebar = self.__filter_by_param(self.__rebar, FILTRATION_1, filter_value, False)
+    #     self.__rebar = self.__filter_by_param(self.__rebar, FILTRATION_2, filter_value, False)
+    #     self.__rebar = self.__filter_by_param(self.__rebar, FORM_NUMBER, 10000, False)
+    #
+    #     self.__concrete = self.__filter_by_param(self.__concrete, FILTRATION_1, filter_value, False)
+    #     self.__concrete = self.__filter_by_param(self.__concrete, FILTRATION_2, filter_value, False)
 
-        if self.__errors_dict:
-            empty_parameters = self.__create_error_list(self.__errors_dict)
-            return empty_parameters
 
-    def filter_by_main_parameters(self):
+    def filter_by_main_exceptions(self):
         filter_value = "Исключить из показателей качества"
 
         self.__rebar = self.__filter_by_param(self.__rebar, FILTRATION_1, filter_value, False)
         self.__rebar = self.__filter_by_param(self.__rebar, FILTRATION_2, filter_value, False)
-        self.__rebar = self.__filter_by_param(self.__rebar, FORM_NUMBER, 10000, False)
 
         self.__concrete = self.__filter_by_param(self.__concrete, FILTRATION_1, filter_value, False)
         self.__concrete = self.__filter_by_param(self.__concrete, FILTRATION_2, filter_value, False)
+
+    def get_filtered_rebar_by_form_number(self, rebar):
+        return self.__filter_by_param(rebar, FORM_NUMBER, 10000, False)
 
     def __get_all_concrete(self):
         all_categories = [BuiltInCategory.OST_Walls,
@@ -988,25 +1030,67 @@ class CreateQualityTableCommand(ICommand):
         selected_sctns = [x for x in construction_sections if x.is_checked]
         concrete = self.__view_model.revit_repository.get_filtered_concrete_by_user(selected_blds, selected_sctns)
         rebar = self.__view_model.revit_repository.get_filtered_rebar_by_blds_and_scts(selected_blds, selected_sctns)
-        check = self.__view_model.revit_repository.check_filtered_rebar(rebar)
+
+        check = self.__view_model.revit_repository.check_exist_concrete_volume_parameter(concrete)
         if check:
             output = script.get_output()
             output.print_table(table_data=check,
                                title="Показатели качества",
                                columns=["Категории", "Тип ошибки", "Название параметра", "Id"])
             script.exit()
-        rebar = self.__view_model.revit_repository.get_filtered_rebar_by_table_type(rebar)
+
+        check = self.__view_model.revit_repository.check_exist_rebar_form_number_parameter(rebar)
+        if check:
+            output = script.get_output()
+            output.print_table(table_data=check,
+                               title="Показатели качества",
+                               columns=["Категории", "Тип ошибки", "Название параметра", "Id"])
+            script.exit()
+
+        rebar = self.__view_model.revit_repository.get_filtered_rebar_by_form_number(rebar)
 
         if not concrete:
             alert("Не найден ЖБ для выбранных секций и разделов")
-        elif not rebar:
+        if not rebar:
             alert("Не найдена арматура для выбранных секций и разделов")
-        else:
-            selected_table_type = self.__view_model.selected_table_type
-            construction = Construction(selected_table_type, concrete, rebar)
-            quality_table = QualityTable(selected_table_type, construction, selected_blds, selected_sctns)
-            new_schedule = quality_table.create_table()
-            uidoc.ActiveView = new_schedule
+
+        check = self.__view_model.revit_repository.check_exist_rebar_parameters(rebar)
+        if check:
+            output = script.get_output()
+            output.print_table(table_data=check,
+                               title="Показатели качества",
+                               columns=["Категории", "Тип ошибки", "Название параметра", "Id"])
+            script.exit()
+
+        check = self.__view_model.revit_repository.check_rebar_parameters_values(rebar)
+        if check:
+            output = script.get_output()
+            output.print_table(table_data=check,
+                               title="Показатели качества",
+                               columns=["Категории", "Тип ошибки", "Название параметра", "Id"])
+            script.exit()
+
+
+
+        # check = self.__view_model.revit_repository.check_filtered_rebar(rebar)
+        # if check:
+        #     output = script.get_output()
+        #     output.print_table(table_data=check,
+        #                        title="Показатели качества",
+        #                        columns=["Категории", "Тип ошибки", "Название параметра", "Id"])
+        #     script.exit()
+        # rebar = self.__view_model.revit_repository.get_filtered_rebar_by_table_type(rebar)
+
+
+
+        selected_table_type = self.__view_model.selected_table_type
+        construction = Construction(selected_table_type, concrete, rebar)
+        quality_table = QualityTable(selected_table_type, construction, selected_blds, selected_sctns)
+        new_schedule = quality_table.create_table()
+        uidoc.ActiveView = new_schedule
+
+
+
         return True
 
 
@@ -1285,6 +1369,7 @@ def script_execute(plugin_logger):
     table_types.append(floor_table_type)
 
     revit_repository = RevitRepository(doc)
+
     check = revit_repository.check_exist_main_parameters()
     if check:
         # Данный код оставлен для быстрого тестирования неизвестной ошибки, описанной в функции __create_error_list()
@@ -1301,37 +1386,11 @@ def script_execute(plugin_logger):
                            columns=["Категории", "Тип ошибки", "Название параметра", "Id"])
         script.exit()
 
-    revit_repository.filter_by_main_parameters()
+    revit_repository.filter_by_main_exceptions()
 
-    check = revit_repository.check_exist_rebar_parameters()
-    if check:
-        # for error in check:
-        #     print("Категория ошибки: " + error[0])
-        #     print("Описание ошибки: " + error[1])
-        #     print("Название параметра: " + error[2])
-        #     print("ID элементов: " + error[3])
-        #
-        #     print("----------------------------------")
-        output = script.get_output()
-        output.print_table(table_data=check,
-                           title="Показатели качества",
-                           columns=["Категории", "Тип ошибки", "Название параметра", "Id"])
-        script.exit()
 
-    check = revit_repository.check_parameters_values()
-    if check:
-        # for error in check:
-        #     print("Категория ошибки: " + error[0])
-        #     print("Описание ошибки: " + error[1])
-        #     print("Название параметра: " + error[2])
-        #     print("ID элементов: " + error[3])
-        #
-        #     print("----------------------------------")
-        output = script.get_output()
-        output.print_table(table_data=check,
-                           title="Показатели качества",
-                           columns=["Категории", "Тип ошибки", "Название параметра", "Id"])
-        script.exit()
+
+
 
     main_window = MainWindow()
     main_window.DataContext = MainWindowViewModel(revit_repository, table_types)
