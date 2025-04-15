@@ -52,8 +52,8 @@ IFC_FAMILY = "мод_ФОП_IFC семейство"
 
 THICKNESS = "Толщина"
 LENGTH = "Длина"
-HEIGHT_ADSK = "ADSK_Размер_Высота"
-WIDTH_ADSK = "ADSK_Размер_Ширина"
+PYLON_CROSS_SECTION_LENGTH = "ФОП_РАЗМ_Длина"
+PYLON_CROSS_SECTION_WIDTH = "ФОП_РАЗМ_Ширина"
 CONCRETE_MARK = "обр_ФОП_Марка бетона B"
 BUILDING_INFO = "Наименование здания"
 
@@ -750,10 +750,10 @@ class Construction:
             for element in self.concrete:
                 element_type = doc.GetElement(element.GetTypeId())
                 if element.Category.Id == columns_category.Id:
-                    if element_type.IsExistsParam(HEIGHT_ADSK) and element_type.IsExistsParam(
-                            WIDTH_ADSK):
-                        height = element_type.GetParam(HEIGHT_ADSK).AsValueString()
-                        width = element_type.GetParam(WIDTH_ADSK).AsValueString()
+                    if element_type.IsExistsParam(PYLON_CROSS_SECTION_LENGTH) and element_type.IsExistsParam(
+                            PYLON_CROSS_SECTION_WIDTH):
+                        height = element_type.GetParam(PYLON_CROSS_SECTION_WIDTH).AsValueString()
+                        width = element_type.GetParam(PYLON_CROSS_SECTION_LENGTH).AsValueString()
                         size = height + "х" + width
                         elements_sizes.add(size)
                 if element.Category.Id == walls_category.Id:
