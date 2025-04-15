@@ -205,7 +205,6 @@ class RevitRepository:
 
     def check_rebar_parameters_values(self, rebar):
         self.__errors_dict = dict()
-        # concrete_inst_parameters = [VOLUME]
         rebar_inst_parameters = [CONSTR_GROUP,
                                  AMOUNT_ON_LEVEL,
                                  AMOUNT_OF_LEVELS]
@@ -280,40 +279,21 @@ class RevitRepository:
                 if not element.GetParam(AMOUNT).HasValue:
                     self.__add_error("Арматура___Отсутствует значение у параметра___", element, AMOUNT)
 
-        # for element in self.__concrete:
-        #     for parameter_name in concrete_inst_parameters:
-        #         if element.GetParamValue(parameter_name) == 0:
-        #             self.__add_error("Железобетон___Отсутствует значение у параметра___", element, parameter_name)
-
         if self.__errors_dict:
             empty_parameters = self.__create_error_list(self.__errors_dict)
             return empty_parameters
-
-
-
-    # def check_filtered_rebar(self, rebar):
-    #     self.__errors_dict = dict()
-    #     rebar_inst_parameters = [CONSTR_GROUP]
-    #
-    #     for element in rebar:
-    #         for parameter_name in rebar_inst_parameters:
-    #             if not element.GetParam(parameter_name).HasValue or element.GetParamValue(parameter_name) == None:
-    #                 self.__add_error("Арматура___Отсутствует значение у параметра___", element, parameter_name)
-    #
-    #     if self.__errors_dict:
-    #         empty_parameters = self.__create_error_list(self.__errors_dict)
-    #         return empty_parameters
-
 
     def filter_concrete_by_main_exceptions(self):
         self.__concrete = self.__filter_by_param(self.__concrete, FILTRATION_1, FILTRATION_VALUE, False)
         self.__concrete = self.__filter_by_param(self.__concrete, FILTRATION_2, FILTRATION_VALUE, False)
         if not self.__concrete:
-            alert("Не найден ЖБ в проекте с учетом исключений из показателей качества")
+            alert("Не найден ЖБ в проекте с учетом исключений из показателей качества", exitscript=True)
 
     def filter_rebar_by_main_exceptions(self):
         self.__rebar = self.__filter_by_param(self.__rebar, FILTRATION_1, FILTRATION_VALUE, False)
         self.__rebar = self.__filter_by_param(self.__rebar, FILTRATION_2, FILTRATION_VALUE, False)
+        if not self.__rebar:
+            alert("Не найдена арматура в проекте с учетом исключений из показателей качества", exitscript=True)
 
     def get_filtered_rebar_by_form_number(self, rebar):
         return self.__filter_by_param(rebar, FORM_NUMBER, 10000, False)
@@ -328,17 +308,15 @@ class RevitRepository:
         for category in all_categories:
             categories_typed.Add(category)
         multi_cat_filter = ElementMulticategoryFilter(categories_typed)
-        elements = FilteredElementCollector(self.doc).WherePasses(multi_cat_filter)
-        elements.WhereElementIsNotElementType()
+        elements = FilteredElementCollector(self.doc).WherePasses(multi_cat_filter).WhereElementIsNotElementType().ToElements()
         if not elements:
-            alert("Не найден ЖБ в проекте")
+            alert("Не найден ЖБ в проекте", exitscript=True)
         return elements
 
     def __get_all_rebar(self):
-        elements = FilteredElementCollector(self.doc).OfCategory(BuiltInCategory.OST_Rebar)
-        elements.WhereElementIsNotElementType().ToElements()
+        elements = FilteredElementCollector(self.doc).OfCategory(BuiltInCategory.OST_Rebar).WhereElementIsNotElementType().ToElements()
         if not elements:
-            alert("Не найдена арматура в проекте")
+            alert("Не найдена арматура в проекте", exitscript=True)
         return elements
 
     def __get_concrete_by_table_type(self):
@@ -1012,10 +990,6 @@ class CreateQualityTableCommand(ICommand):
         if not self.__view_model.buildings:
             self.__view_model.error_text = "ЖБ не найден в проекте"
             return False
-        # if not self.__view_model.revit_repository.rebar:
-        #     self.__view_model.error_text = "Арматура не найдена в проекте"
-        #     return False
-
         self.__view_model.error_text = None
         return True
 
@@ -1071,9 +1045,9 @@ class CreateQualityTableCommand(ICommand):
         rebar = self.__view_model.revit_repository.get_filtered_rebar_by_form_number(rebar)
 
         if not concrete:
-            alert("Не найден ЖБ для выбранных секций и разделов")
+            alert("Не найден ЖБ для выбранных секций и разделов", exitscript=True)
         if not rebar:
-            alert("Не найдена арматура для выбранных секций и разделов")
+            alert("Не найдена арматура для выбранных секций и разделов", exitscript=True)
 
         # Проверяем наличие параметров арматуры необходимых для расчетов
         check = self.__view_model.revit_repository.check_exist_rebar_parameters(rebar)
@@ -1092,27 +1066,11 @@ class CreateQualityTableCommand(ICommand):
                                columns=["Категории", "Тип ошибки", "Название параметра", "Id"])
             script.exit()
 
-
-
-        # check = self.__view_model.revit_repository.check_filtered_rebar(rebar)
-        # if check:
-        #     output = script.get_output()
-        #     output.print_table(table_data=check,
-        #                        title="Показатели качества",
-        #                        columns=["Категории", "Тип ошибки", "Название параметра", "Id"])
-        #     script.exit()
-        # rebar = self.__view_model.revit_repository.get_filtered_rebar_by_table_type(rebar)
-
-
-
         selected_table_type = self.__view_model.selected_table_type
         construction = Construction(selected_table_type, concrete, rebar)
         quality_table = QualityTable(selected_table_type, construction, selected_blds, selected_sctns)
         new_schedule = quality_table.create_table()
         uidoc.ActiveView = new_schedule
-
-
-
         return True
 
 
