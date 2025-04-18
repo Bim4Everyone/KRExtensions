@@ -41,7 +41,7 @@ material_with_waterproofing_name = 'Бетон с Пенетроном'
 
 param_name_for_length = 'ФОП_РАЗМ_Длина'
 param_name_for_width = 'ФОП_РАЗМ_Ширина'
-param_name_for_height = 'ФОП_РАЗМ_Высота'
+param_name_for_height = 'Высота_Всп'
 param_name_for_reinforcement = 'ТЗА_Характеристики'
 param_name_for_write = 'Марка'
 
@@ -124,9 +124,14 @@ def get_pylon_data(pylons):
                 pylon_type.GetParamValue(param_name_for_width),
                 UnitTypeId.Centimeters)
             # Получаем высоту пилона
-            height = convert_to_int_from_internal_value(
-                pylon.GetParamValue(param_name_for_height),
-                UnitTypeId.Decimeters)
+            # В связи с некорректностью перевода единиц в дм при помощи стандартного класса API UnitUtils,
+            # в случаях, когда значение находится на пограничном состоянии (оканчивается на 5, например,
+            # 2750, будет переведено в 27, а требуется 28), было принято решение изменить подход получения данных
+            # о высоте пилона в дм.
+            # Так как пилоны в текущей технологии проектирования имеют такую особенность габарита только по высоте,
+            # то изменен только данный фрагмент.
+            height = float(pylon.GetParam(param_name_for_height).AsValueString())
+            height = int(round(height / 100))
             # Получаем выбранное пользователем армирование для пилона
             reinforcement = pylon.GetParamValue(param_name_for_reinforcement)
             if reinforcement is None:
@@ -324,7 +329,7 @@ def script_execute(plugin_logger):
     print("Здравствуйте! Данный плагин предназначен для маркировки пилонов на основе следующих параметров:")
     print("- \"ФОП_РАЗМ_Длина\"")
     print("- \"ФОП_РАЗМ_Ширина\"")
-    print("- \"ФОП_РАЗМ_Высота\"")
+    print("- \"Высота_Всп\"")
     print("- \"обр_ФОП_АРМ_Пилон\"")
     print("- <Имя материала> (на наличие строки \"Бетон с Пенетроном\")")
 
