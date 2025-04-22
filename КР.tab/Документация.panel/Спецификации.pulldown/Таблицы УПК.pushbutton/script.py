@@ -768,6 +768,22 @@ class Construction:
             self.__quality_indexes[
                 "Коэффициент суммарной площади сечений пилонов от площади перекрытия, ΣAw/Ap х 100"] = 0
 
+        if self.table_type.name == "Колонны":
+            for element in self.concrete:
+                element_type = doc.GetElement(element.GetTypeId())
+                if element.Category.Id == columns_category.Id:
+                    if element_type.IsExistsParam(PYLON_CROSS_SECTION_LENGTH) and element_type.IsExistsParam(
+                            PYLON_CROSS_SECTION_WIDTH):
+                        height = element_type.GetParam(PYLON_CROSS_SECTION_WIDTH).AsValueString()
+                        width = element_type.GetParam(PYLON_CROSS_SECTION_LENGTH).AsValueString()
+                        size = height + "х" + width
+                        elements_sizes.add(size)
+            elements_sizes = sorted(list(elements_sizes))
+            self.__quality_indexes["Сечение колонн, толщина х ширина, мм"] = ", ".join(elements_sizes)
+
+            self.__quality_indexes[
+                "Коэффициент суммарной площади сечений колонн от площади перекрытия, ΣAw/Ap х 100"] = 0
+
         if "Стены" in self.table_type.name:
             elements_sizes = self.__find_elements_width(self.concrete)
             self.__quality_indexes["Толщина стен, мм"] = ", ".join(elements_sizes)
@@ -1273,15 +1289,15 @@ def script_execute(plugin_logger):
         QualityIndex("Общий расход, кг/м3", "8")]
 
     columns_table_type = TableType("Колонны")
-    columns_table_type.categories = [walls_cat, columns_cat]
+    columns_table_type.categories = [columns_cat]
     columns_table_type.type_key_word = ["Колонна"]
     columns_table_type.concrete_group = ["Колонны"]
     columns_table_type.indexes_info = [
         QualityIndex("Этажность здания, тип секции", "1"),
-        QualityIndex("Сечение пилонов, толщина х ширина, мм", "2"),
+        QualityIndex("Сечение колонн, толщина х ширина, мм", "2"),
         QualityIndex("Класс бетона", "3"),
         QualityIndex("Объем бетона, м3", "4"),
-        QualityIndex("Коэффициент суммарной площади сечений пилонов от площади перекрытия, ΣAw/Ap х 100", "5"),
+        QualityIndex("Коэффициент суммарной площади сечений колонн от площади перекрытия, ΣAw/Ap х 100", "5"),
         QualityIndex("Масса продольной арматуры, кг", "6.1", "mass", ["Колонны_Продольная"]),
         QualityIndex("Расход продольной арматуры, кг/м3", "6.2", "consumption", ["Колонны_Продольная"]),
         QualityIndex("Масса поперечной арматуры, кг", "7.1", "mass", ["Колонны_Поперечная"]),
