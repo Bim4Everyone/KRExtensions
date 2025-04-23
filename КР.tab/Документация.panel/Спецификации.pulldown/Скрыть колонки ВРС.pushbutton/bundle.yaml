@@ -1,0 +1,19 @@
+title:
+  ru: Скрыть колонки ВРС
+  en_us: Hide columns of SCS
+
+tooltip:
+  ru: Скрывает все колонки ведомости расхода стали, значения в которых равны нулю. В случае, если колонки, в которых 
+      есть значения отличные от нуля были скрыты, то плагин покажет их.
+  
+      Перед запуском открыть спецификацию, с которой хотите поработать.
+  en_us: Hides all columns of the steel consumption statement, the values of which are equal to zero. 
+         If the columns, which have values different from zero, were hidden, the plugin will show them. 
+    
+         Before starting, open the specification with which you want to work.
+
+author: Divin_N
+help_url: "https://kb.a101.ru/pages/viewpage.action?pageId=110562599"
+
+min_revit_version: 2020
+max_revit_version: 2024
