@@ -33,7 +33,7 @@ output = script.output.get_output()
 struct_columns_category_id = ElementId(BuiltInCategory.OST_StructuralColumns)
 '''Id категории "Несущие колонны" для фильтрации нужных элементов'''
 
-pylon_type_name_keyword = 'Пилон'
+pylon_type_names_keyword = ['Пилон', 'Колонна']
 '''Ключевое слово в имени типа элемента для фильтрации нужных элементов'''
 
 material_with_waterproofing_name = 'Бетон с Пенетроном'
@@ -69,9 +69,20 @@ def get_pylons():
         output.close()
         alert("Не выбрано ни одного элемента", exitscript=True)
 
+    '''
     elements = [doc.GetElement(selectedId) for selectedId in selected_ids]
     pylons = [elem for elem in elements
               if elem.Category.Id == struct_columns_category_id and elem.Name.Contains(pylon_type_name_keyword)]
+    '''
+
+    pylons = []
+    for selectedId in selected_ids:
+        elem = doc.GetElement(selectedId)
+        if elem.Category.Id != struct_columns_category_id:
+            continue
+        for pylon_type_name_keyword in pylon_type_names_keyword:
+            if elem.Name.Contains(pylon_type_name_keyword):
+                pylons.append(elem)
 
     if len(pylons) == 0:
         global output
@@ -130,7 +141,14 @@ def get_pylon_data(pylons):
             # о высоте пилона в дм.
             # Так как пилоны в текущей технологии проектирования имеют такую особенность габарита только по высоте,
             # то изменен только данный фрагмент.
-            height = float(pylon.GetParam(param_name_for_height).AsValueString())
+
+            if pylon.IsExistsParam(param_name_for_height):
+                height = float(pylon.GetParam(param_name_for_height).AsValueString())
+            elif pylon.IsExistsParam("ФОП_РАЗМ_Высота"):
+                height = float(pylon.GetParam("ФОП_РАЗМ_Высота").AsValueString())
+            else:
+                raise Exception('Параметра с информацией о высоте у элемента не существует.')
+
             height = int(round(height / 100))
             # Получаем выбранное пользователем армирование для пилона
             reinforcement = pylon.GetParamValue(param_name_for_reinforcement)
