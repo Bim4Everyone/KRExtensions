@@ -34,6 +34,7 @@ struct_columns_category_id = ElementId(BuiltInCategory.OST_StructuralColumns)
 '''Id категории "Несущие колонны" для фильтрации нужных элементов'''
 
 pylon_type_name_keyword = 'Пилон'
+column_type_name_keyword = 'Колонна'
 '''Ключевое слово в имени типа элемента для фильтрации нужных элементов'''
 
 material_with_waterproofing_name = 'Бетон с Пенетроном'
@@ -41,7 +42,8 @@ material_with_waterproofing_name = 'Бетон с Пенетроном'
 
 param_name_for_length = 'ФОП_РАЗМ_Длина'
 param_name_for_width = 'ФОП_РАЗМ_Ширина'
-param_name_for_height = 'Высота_Всп'
+param_name_for_pylon_height = 'Высота_Всп'
+param_name_for_column_height = 'ФОП_РАЗМ_Высота'
 param_name_for_reinforcement = 'ТЗА_Характеристики'
 param_name_for_write = 'Марка'
 
@@ -70,8 +72,9 @@ def get_pylons():
         alert("Не выбрано ни одного элемента", exitscript=True)
 
     elements = [doc.GetElement(selectedId) for selectedId in selected_ids]
-    pylons = [elem for elem in elements
-              if elem.Category.Id == struct_columns_category_id and elem.Name.Contains(pylon_type_name_keyword)]
+    pylons = [elem for elem in elements if elem.Category.Id == struct_columns_category_id ]
+    pylons = [pylon for pylon in pylons
+              if pylon.Name.Contains(pylon_type_name_keyword) or pylon.Name.Contains(column_type_name_keyword)]
 
     if len(pylons) == 0:
         global output
@@ -118,7 +121,7 @@ def get_pylon_data(pylons):
             # Получаем длину пилона
             length = convert_to_int_from_internal_value(
                 pylon_type.GetParamValue(param_name_for_length),
-                UnitTypeId.Decimeters)
+                UnitTypeId.Centimeters)
             # Получаем толщину пилона
             width = convert_to_int_from_internal_value(
                 pylon_type.GetParamValue(param_name_for_width),
@@ -130,7 +133,12 @@ def get_pylon_data(pylons):
             # о высоте пилона в дм.
             # Так как пилоны в текущей технологии проектирования имеют такую особенность габарита только по высоте,
             # то изменен только данный фрагмент.
-            height = float(pylon.GetParam(param_name_for_height).AsValueString())
+            if pylon_type.IsExistsParam(param_name_for_pylon_height):
+                height_temp = pylon.GetParam(param_name_for_pylon_height)
+            else:
+                height_temp = pylon.GetParam(param_name_for_column_height)
+
+            height = float(height_temp.AsValueString())
             height = int(round(height / 100))
             # Получаем выбранное пользователем армирование для пилона
             reinforcement = pylon.GetParamValue(param_name_for_reinforcement)
@@ -333,10 +341,10 @@ def script_execute(plugin_logger):
     print("- \"обр_ФОП_АРМ_Пилон\"")
     print("- <Имя материала> (на наличие строки \"Бетон с Пенетроном\")")
 
-    print("Запись будет производиться в параметр \"Марка\". Пример записи: \"18.35.40-35ф24-д\"")
+    print("Запись будет производиться в параметр \"Марка\". Пример записи: \"180.35.40-35ф24-д\"")
 
     print("Из всех выбранных элементов будут отобраны только те, что имеют категорию \"Несущие колонны\" "
-          "и имя типа со словом \"Пилон\".")
+          "и имя типа со словом \"Пилон\" или \"Колонна\".")
     print("Например, \"НН_Пилон-350х1800 (ЖБ B40 F150 W6)\".")
 
     pylons = get_pylons()
