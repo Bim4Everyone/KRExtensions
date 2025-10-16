@@ -1,6 +1,6 @@
 title:
-  ru: Отключить 3D арматуру
-  en_us: Disable 3D rebar
+  ru: Отключить
+  en_us: Disable
 
 tooltip:
   ru: Отключает отображение 3D арматуры на текущем 3D виде
