@@ -37,7 +37,7 @@ pylon_type_name_keyword = 'Пилон'
 column_type_name_keyword = 'Колонна'
 '''Ключевое слово в имени типа элемента для фильтрации нужных элементов'''
 
-material_with_waterproofing_name = 'Бетон с Пенетроном'
+material_with_waterproofing_name = 'бетон с пенетроном'
 '''Фрагмент имени материала,указывающий на то, что в бетоне будут присутствовать гидрофобные добавки'''
 
 param_name_for_length = 'ФОП_РАЗМ_Длина'
@@ -102,7 +102,7 @@ def get_waterproofing(pylon):
     waterproofing = ''
     for material_id in pylon.GetMaterialIds(False):
         material = doc.GetElement(material_id)
-        if material.Name.Contains(material_with_waterproofing_name):
+        if material.Name.lower().Contains(material_with_waterproofing_name):
             waterproofing = '-д'
             break
     return waterproofing
