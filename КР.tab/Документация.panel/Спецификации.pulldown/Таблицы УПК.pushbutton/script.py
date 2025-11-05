@@ -1332,7 +1332,7 @@ def script_execute(plugin_logger):
         QualityIndex("Общий расход, кг/м3", "10")]
 
     floor_table_type = TableType("Плита перекрытия")
-    floor_table_type.categories = [floor_cat, framing_cat, walls_cat]
+    floor_table_type.categories = [floor_cat, framing_cat, walls_cat, columns_cat]
     floor_table_type.type_key_word = ["Перекрытие", "Балка", "Капитель"]
     floor_table_type.concrete_group = ["ПП"]
     floor_table_type.indexes_info = [
