@@ -1023,6 +1023,7 @@ class CreateQualityTableCommand(ICommand):
             output.print_table(table_data=check,
                                title="Показатели качества",
                                columns=["Категории", "Тип ошибки", "Название параметра", "Id"])
+            print("Выполнение скрипта прервано!")
             script.exit()
 
         # Приступаем к проверке арматуры проекта
@@ -1040,6 +1041,7 @@ class CreateQualityTableCommand(ICommand):
             output.print_table(table_data=check,
                                title="Показатели качества",
                                columns=["Категории", "Тип ошибки", "Название параметра", "Id"])
+            print("Выполнение скрипта прервано!")
             script.exit()
 
         # Выполняем фильтрацию элементов арматуры по пользовательским исключениям
@@ -1055,6 +1057,7 @@ class CreateQualityTableCommand(ICommand):
             output.print_table(table_data=check,
                                title="Показатели качества",
                                columns=["Категории", "Тип ошибки", "Название параметра", "Id"])
+            print("Выполнение скрипта прервано!")
             script.exit()
 
         # Фильтруем родительские семейства арматуры
@@ -1072,6 +1075,7 @@ class CreateQualityTableCommand(ICommand):
             output.print_table(table_data=check,
                                title="Показатели качества",
                                columns=["Категории", "Тип ошибки", "Название параметра", "Id"])
+            print("Выполнение скрипта прервано!")
             script.exit()
 
         check = self.__view_model.revit_repository.check_rebar_parameters_values(rebar)
@@ -1080,6 +1084,7 @@ class CreateQualityTableCommand(ICommand):
             output.print_table(table_data=check,
                                title="Показатели качества",
                                columns=["Категории", "Тип ошибки", "Название параметра", "Id"])
+            print("Выполнение скрипта прервано!")
             script.exit()
 
         selected_table_type = self.__view_model.selected_table_type
@@ -1380,6 +1385,7 @@ def script_execute(plugin_logger):
         output.print_table(table_data=check,
                            title="Показатели качества",
                            columns=["Категории", "Тип ошибки", "Название параметра", "Id"])
+        print("Выполнение скрипта прервано!")
         script.exit()
 
     revit_repository.filter_concrete_by_main_exceptions()
