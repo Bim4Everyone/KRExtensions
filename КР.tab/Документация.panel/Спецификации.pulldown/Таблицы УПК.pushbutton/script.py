@@ -813,6 +813,10 @@ class Construction:
             element_type = doc.GetElement(element.GetTypeId())
             if element_type.IsExistsParam(CONCRETE_MARK):
                 value = element_type.GetParam(CONCRETE_MARK).AsValueString()
+                if value is None:
+                    print("В элементе с ID \"{}\" не заполнен параметр \"{}\"!".format(element.Id, CONCRETE_MARK))
+                    print("Выполнение скрипта прервано!")
+                    script.exit()
                 concrete_class = "В" + value
                 concrete_classes.add(concrete_class)
         self.__quality_indexes["Класс бетона"] = ", ".join(concrete_classes)
