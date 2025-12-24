@@ -113,7 +113,7 @@ class PartsSchedule:
         return element.GetParamValueOrDefault(param_name)
 
     def __group_elements(self):
-        dict_by_number = self.__create_dict_by_param(self.elements, self.num_param_name, False)
+        dict_by_number = self.__create_dict_by_param(self.elements, self.num_param_name, True)
         for key in dict_by_number.keys():
             dict_by_prior = self.__create_dict_by_param(dict_by_number[key], self.posit_param_name, True)
             dict_by_number[key] = dict_by_prior
