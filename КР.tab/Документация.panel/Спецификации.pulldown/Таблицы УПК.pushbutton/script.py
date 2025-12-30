@@ -57,6 +57,7 @@ PYLON_CROSS_SECTION_WIDTH = "ФОП_РАЗМ_Ширина"
 CONCRETE_MARK = "обр_ФОП_Марка бетона B"
 BUILDING_INFO = "Наименование здания"
 
+ERROR_MESSAGE = "Выполнение скрипта прервано!"
 
 class RevitRepository:
     """
@@ -813,6 +814,10 @@ class Construction:
             element_type = doc.GetElement(element.GetTypeId())
             if element_type.IsExistsParam(CONCRETE_MARK):
                 value = element_type.GetParam(CONCRETE_MARK).AsValueString()
+                if value is None:
+                    print("В элементе с ID \"{}\" не заполнен параметр \"{}\"!".format(element.Id, CONCRETE_MARK))
+                    print(ERROR_MESSAGE)
+                    script.exit()
                 concrete_class = "В" + value
                 concrete_classes.add(concrete_class)
         self.__quality_indexes["Класс бетона"] = ", ".join(concrete_classes)
@@ -1023,6 +1028,7 @@ class CreateQualityTableCommand(ICommand):
             output.print_table(table_data=check,
                                title="Показатели качества",
                                columns=["Категории", "Тип ошибки", "Название параметра", "Id"])
+            print(ERROR_MESSAGE)
             script.exit()
 
         # Приступаем к проверке арматуры проекта
@@ -1040,6 +1046,7 @@ class CreateQualityTableCommand(ICommand):
             output.print_table(table_data=check,
                                title="Показатели качества",
                                columns=["Категории", "Тип ошибки", "Название параметра", "Id"])
+            print(ERROR_MESSAGE)
             script.exit()
 
         # Выполняем фильтрацию элементов арматуры по пользовательским исключениям
@@ -1055,6 +1062,7 @@ class CreateQualityTableCommand(ICommand):
             output.print_table(table_data=check,
                                title="Показатели качества",
                                columns=["Категории", "Тип ошибки", "Название параметра", "Id"])
+            print(ERROR_MESSAGE)
             script.exit()
 
         # Фильтруем родительские семейства арматуры
@@ -1072,6 +1080,7 @@ class CreateQualityTableCommand(ICommand):
             output.print_table(table_data=check,
                                title="Показатели качества",
                                columns=["Категории", "Тип ошибки", "Название параметра", "Id"])
+            print(ERROR_MESSAGE)
             script.exit()
 
         check = self.__view_model.revit_repository.check_rebar_parameters_values(rebar)
@@ -1080,6 +1089,7 @@ class CreateQualityTableCommand(ICommand):
             output.print_table(table_data=check,
                                title="Показатели качества",
                                columns=["Категории", "Тип ошибки", "Название параметра", "Id"])
+            print(ERROR_MESSAGE)
             script.exit()
 
         selected_table_type = self.__view_model.selected_table_type
@@ -1380,6 +1390,7 @@ def script_execute(plugin_logger):
         output.print_table(table_data=check,
                            title="Показатели качества",
                            columns=["Категории", "Тип ошибки", "Название параметра", "Id"])
+        print(ERROR_MESSAGE)
         script.exit()
 
     revit_repository.filter_concrete_by_main_exceptions()
