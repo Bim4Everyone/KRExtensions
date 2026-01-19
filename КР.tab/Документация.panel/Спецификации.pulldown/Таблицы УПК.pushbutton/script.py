@@ -58,6 +58,8 @@ CONCRETE_MARK = "обр_ФОП_Марка бетона B"
 BUILDING_INFO = "Наименование здания"
 
 ERROR_MESSAGE = "Выполнение скрипта прервано!"
+form_number_min_for_rebar = 1000
+form_number_min_for_embedded = 2000
 
 class RevitRepository:
     """
@@ -193,7 +195,7 @@ class RevitRepository:
                 elif element_type.IsExistsParam(FORM_NUMBER):
                     number_value = element_type.GetParamValue(FORM_NUMBER)
 
-                if number_value >= 2000:
+                if number_value >= form_number_min_for_embedded:
                     if not element.IsExistsParam(parameter_name) and not element_type.IsExistsParam(parameter_name):
                         self.__add_error("Арматура___Отсутствует параметр у экземпляра или типоразмера___", element, parameter_name)
 
@@ -249,10 +251,10 @@ class RevitRepository:
                 else:
                     form_number = element_type.GetParamValueOrDefault(FORM_NUMBER)
 
-                if form_number < 1000:
-                    self.__add_error("Арматура___В арматуре значение параметра меньше 1000. Обновите семейство!___",
+                if form_number < form_number_min_for_rebar:
+                    self.__add_error('Арматура___В арматуре значение параметра меньше {}. Обновите семейство!___'.format(form_number_min_for_rebar),
                                      element, FORM_NUMBER)
-                elif 1000 <= form_number < 2000:
+                elif form_number_min_for_rebar <= form_number < form_number_min_for_embedded:
                     if element.IsExistsParam(parameter_name):
                         if not element.GetParam(parameter_name).HasValue or element.GetParamValue(parameter_name) == None:
                             self.__add_error("Арматура___Отсутствует значение у параметра (экземпляра или типа)___",
@@ -268,7 +270,7 @@ class RevitRepository:
                 elif element_type.IsExistsParam(FORM_NUMBER):
                     number_value = element_type.GetParamValue(FORM_NUMBER)
 
-                if number_value >= 2000:
+                if number_value >= form_number_min_for_embedded:
                     if element.IsExistsParam(parameter_name):
                         if not element.GetParam(parameter_name).HasValue or element.GetParamValue(parameter_name) == None:
                             self.__add_error("Арматура___Отсутствует значение у параметра (экземпляра или типа)___", element, parameter_name)
@@ -664,7 +666,7 @@ class Construction:
             else:
                 form_number = element_type.GetParamValue(FORM_NUMBER)
 
-            if 1000 <= form_number < 2000:
+            if form_number_min_for_rebar <= form_number < form_number_min_for_embedded:
                 if diameter in self.__diameter_dict.keys():
                     mass_per_metr = self.__diameter_dict[diameter]
                 else:
