@@ -57,6 +57,9 @@ PYLON_CROSS_SECTION_WIDTH = "ФОП_РАЗМ_Ширина"
 CONCRETE_MARK = "обр_ФОП_Марка бетона B"
 BUILDING_INFO = "Наименование здания"
 
+ERROR_MESSAGE = "Выполнение скрипта прервано!"
+form_number_min_for_rebar = 1000
+form_number_min_for_embedded = 2000
 
 class RevitRepository:
     """
@@ -192,7 +195,7 @@ class RevitRepository:
                 elif element_type.IsExistsParam(FORM_NUMBER):
                     number_value = element_type.GetParamValue(FORM_NUMBER)
 
-                if number_value >= 2000:
+                if number_value >= form_number_min_for_embedded:
                     if not element.IsExistsParam(parameter_name) and not element_type.IsExistsParam(parameter_name):
                         self.__add_error("Арматура___Отсутствует параметр у экземпляра или типоразмера___", element, parameter_name)
 
@@ -248,7 +251,10 @@ class RevitRepository:
                 else:
                     form_number = element_type.GetParamValueOrDefault(FORM_NUMBER)
 
-                if 1000 <= form_number < 2000:
+                if form_number < form_number_min_for_rebar:
+                    self.__add_error('Арматура___В арматуре значение параметра меньше {}. Обновите семейство!___'.format(form_number_min_for_rebar),
+                                     element, FORM_NUMBER)
+                elif form_number_min_for_rebar <= form_number < form_number_min_for_embedded:
                     if element.IsExistsParam(parameter_name):
                         if not element.GetParam(parameter_name).HasValue or element.GetParamValue(parameter_name) == None:
                             self.__add_error("Арматура___Отсутствует значение у параметра (экземпляра или типа)___",
@@ -264,7 +270,7 @@ class RevitRepository:
                 elif element_type.IsExistsParam(FORM_NUMBER):
                     number_value = element_type.GetParamValue(FORM_NUMBER)
 
-                if number_value >= 2000:
+                if number_value >= form_number_min_for_embedded:
                     if element.IsExistsParam(parameter_name):
                         if not element.GetParam(parameter_name).HasValue or element.GetParamValue(parameter_name) == None:
                             self.__add_error("Арматура___Отсутствует значение у параметра (экземпляра или типа)___", element, parameter_name)
@@ -660,7 +666,7 @@ class Construction:
             else:
                 form_number = element_type.GetParamValue(FORM_NUMBER)
 
-            if 1000 <= form_number < 2000:
+            if form_number_min_for_rebar <= form_number < form_number_min_for_embedded:
                 if diameter in self.__diameter_dict.keys():
                     mass_per_metr = self.__diameter_dict[diameter]
                 else:
@@ -813,6 +819,10 @@ class Construction:
             element_type = doc.GetElement(element.GetTypeId())
             if element_type.IsExistsParam(CONCRETE_MARK):
                 value = element_type.GetParam(CONCRETE_MARK).AsValueString()
+                if value is None:
+                    print("В элементе с ID \"{}\" не заполнен параметр \"{}\"!".format(element.Id, CONCRETE_MARK))
+                    print(ERROR_MESSAGE)
+                    script.exit()
                 concrete_class = "В" + value
                 concrete_classes.add(concrete_class)
         self.__quality_indexes["Класс бетона"] = ", ".join(concrete_classes)
@@ -1023,6 +1033,7 @@ class CreateQualityTableCommand(ICommand):
             output.print_table(table_data=check,
                                title="Показатели качества",
                                columns=["Категории", "Тип ошибки", "Название параметра", "Id"])
+            print(ERROR_MESSAGE)
             script.exit()
 
         # Приступаем к проверке арматуры проекта
@@ -1040,6 +1051,7 @@ class CreateQualityTableCommand(ICommand):
             output.print_table(table_data=check,
                                title="Показатели качества",
                                columns=["Категории", "Тип ошибки", "Название параметра", "Id"])
+            print(ERROR_MESSAGE)
             script.exit()
 
         # Выполняем фильтрацию элементов арматуры по пользовательским исключениям
@@ -1055,6 +1067,7 @@ class CreateQualityTableCommand(ICommand):
             output.print_table(table_data=check,
                                title="Показатели качества",
                                columns=["Категории", "Тип ошибки", "Название параметра", "Id"])
+            print(ERROR_MESSAGE)
             script.exit()
 
         # Фильтруем родительские семейства арматуры
@@ -1072,6 +1085,7 @@ class CreateQualityTableCommand(ICommand):
             output.print_table(table_data=check,
                                title="Показатели качества",
                                columns=["Категории", "Тип ошибки", "Название параметра", "Id"])
+            print(ERROR_MESSAGE)
             script.exit()
 
         check = self.__view_model.revit_repository.check_rebar_parameters_values(rebar)
@@ -1080,6 +1094,7 @@ class CreateQualityTableCommand(ICommand):
             output.print_table(table_data=check,
                                title="Показатели качества",
                                columns=["Категории", "Тип ошибки", "Название параметра", "Id"])
+            print(ERROR_MESSAGE)
             script.exit()
 
         selected_table_type = self.__view_model.selected_table_type
@@ -1380,6 +1395,7 @@ def script_execute(plugin_logger):
         output.print_table(table_data=check,
                            title="Показатели качества",
                            columns=["Категории", "Тип ошибки", "Название параметра", "Id"])
+        print(ERROR_MESSAGE)
         script.exit()
 
     revit_repository.filter_concrete_by_main_exceptions()
