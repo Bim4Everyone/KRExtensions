@@ -250,8 +250,8 @@ class RevitRepository:
                     form_number = element_type.GetParamValueOrDefault(FORM_NUMBER)
 
                 if form_number < 1000:
-                    self.__add_error('Арматура___В арматуре значение "{}" меньше 1000. Обновите семейство!___'.format(FORM_NUMBER),
-                                     element, parameter_name)
+                    self.__add_error("Арматура___В арматуре значение параметра меньше 1000. Обновите семейство!___",
+                                     element, FORM_NUMBER)
                 elif 1000 <= form_number < 2000:
                     if element.IsExistsParam(parameter_name):
                         if not element.GetParam(parameter_name).HasValue or element.GetParamValue(parameter_name) == None:
