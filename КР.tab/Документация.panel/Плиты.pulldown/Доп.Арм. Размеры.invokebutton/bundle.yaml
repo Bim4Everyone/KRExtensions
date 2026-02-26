@@ -1,0 +1,17 @@
+title:
+  ru: Доп.Арм. Размеры
+  en_us: Доп.Арм. Размеры
+
+tooltip:
+  ru: >- 
+    Please Write Description
+  en_us: >- 
+    Please Write Description
+
+assembly: RevitDocumenter.dll
+command_class: RevitDocumenterCommand
+
+author: DivinN
+
+min_revit_version: 2022
+max_revit_version: 2024
