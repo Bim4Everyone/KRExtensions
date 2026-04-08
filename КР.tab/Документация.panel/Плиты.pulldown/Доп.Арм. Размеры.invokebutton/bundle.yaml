@@ -4,14 +4,15 @@ title:
 
 tooltip:
   ru: >- 
-    Please Write Description
+    Создает размеры на виде между зонами дополнительного армирования и осями
   en_us: >- 
-    Please Write Description
+    Creates dimensions in the view between additional reinforcement zones and axes
 
 assembly: RevitDocumenter.dll
-command_class: RevitDocumenterCommand
+command_class: RebarDimensioningCommand
 
 author: DivinN
+help_url: "https://kb.a101.ru/pages/viewpage.action?pageId=191827805"
 
 min_revit_version: 2022
 max_revit_version: 2024
