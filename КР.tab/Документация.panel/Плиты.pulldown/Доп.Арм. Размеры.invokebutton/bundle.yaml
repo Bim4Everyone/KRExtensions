@@ -1,0 +1,41 @@
+title:
+  ru: Доп.Арм. Размеры
+  en_us: Add.Rebars. Dimensions
+
+tooltip:
+  ru: >- 
+    Создает размеры на виде между зонами дополнительного армирования и осями.
+    Для запуска: 
+    
+    1. Перейти на план, который хотите оформить, где видны оси и зоны дополнительного армирования;
+    
+    2. Нажать кнопку "Доп.Арм. Размеры";
+    
+    3. Выбрать типоразмер, при помощи которого хотите создать размеры;
+    
+    4. Снять галочку "Позиционировать размеры точно", если не хотите создавать размеры точно, а хотите разместить их приблизительно;
+    
+    5. Нажать Ок.
+
+  en_us: >- 
+    Creates dimensions in the view between additional reinforcement zones and axes.
+    To start:
+
+    1. Go to the plan you want to create, where the axes and additional reinforcement zones are visible;
+
+    2. Click the "Add.Rebars. Dimensions" button;
+
+    3. Select the dimension type you want to use to create the dimensions;
+
+    4. Uncheck "Position dimensions accurately" if you don't want to create the dimensions precisely, but want to place them approximately;
+
+    5. Click OK.
+
+assembly: RevitDocumenter.dll
+command_class: RebarDimensioningCommand
+
+author: DivinN
+help_url: "https://kb.a101.ru/pages/viewpage.action?pageId=191827805"
+
+min_revit_version: 2022
+max_revit_version: 2024
