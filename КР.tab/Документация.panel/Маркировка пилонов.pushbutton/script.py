@@ -316,6 +316,10 @@ def get_needed_tag_type_id(pylon_tag):
     bounding_box_min = bounding_box.Min
     length = float(convert_to_int_from_internal_value(bounding_box_max.X - bounding_box_min.X, UnitTypeId.Millimeters))
 
+    # Определяем длину марки с учетом масштаба
+    # В словаре значения для масштаба 1:100, но масштаб на виде может быть другой
+    length = length * (100.0 / active_view.Scale)
+
     # Определяем ближайшее большее значение из имеющихся в типоразмерах
     global tag_symbols_dict
     sorted_keys = sorted(tag_symbols_dict.keys())
