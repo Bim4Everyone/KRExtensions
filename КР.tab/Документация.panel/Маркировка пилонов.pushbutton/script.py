@@ -47,11 +47,11 @@ param_name_for_column_height = 'ФОП_РАЗМ_Высота'
 param_name_for_reinforcement = 'ТЗА_Характеристики'
 param_name_for_write = 'Марка'
 
-tag_family_name = '!Марка_Несущая колонны'
+tag_family_name = 'Марка_Несущие колонны'
 
 tag_symbols_dict = {}
-tag_symbol_name_prefix = 'Марка_Полка '
-tag_symbol_name_suffix = ' мм'
+tag_symbol_name_prefix = 'Марка (Полка '
+tag_symbol_name_suffix = ' мм)'
 
 tag_elbow_offset = XYZ(2.0, 3.0, 0.0)
 tag_header_offset = XYZ(3.5, 0.0, 0.0)
