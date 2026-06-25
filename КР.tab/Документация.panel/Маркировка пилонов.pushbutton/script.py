@@ -47,11 +47,11 @@ param_name_for_column_height = 'ФОП_РАЗМ_Высота'
 param_name_for_reinforcement = 'ТЗА_Характеристики'
 param_name_for_write = 'Марка'
 
-tag_family_name = '!Марка_Несущая колонны'
+tag_family_name = 'Марка_Несущие колонны'
 
 tag_symbols_dict = {}
-tag_symbol_name_prefix = 'Марка_Полка '
-tag_symbol_name_suffix = ' мм'
+tag_symbol_name_prefix = 'Марка (Полка '
+tag_symbol_name_suffix = ' мм)'
 
 tag_elbow_offset = XYZ(2.0, 3.0, 0.0)
 tag_header_offset = XYZ(3.5, 0.0, 0.0)
@@ -315,6 +315,10 @@ def get_needed_tag_type_id(pylon_tag):
     bounding_box_max = bounding_box.Max
     bounding_box_min = bounding_box.Min
     length = float(convert_to_int_from_internal_value(bounding_box_max.X - bounding_box_min.X, UnitTypeId.Millimeters))
+
+    # Определяем длину марки с учетом масштаба
+    # В словаре значения для масштаба 1:100, но масштаб на виде может быть другой
+    length = length * (100.0 / active_view.Scale)
 
     # Определяем ближайшее большее значение из имеющихся в типоразмерах
     global tag_symbols_dict
