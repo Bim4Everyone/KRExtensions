@@ -1,0 +1,49 @@
+title:
+  ru: "Толщина\nБИО"
+  en_us: "Landscape\nthickness"
+
+tooltip:
+  ru: >- 
+    Определяет усредненную толщину слоя БИО по грузовым площадям пилонов.
+    Для запуска: 
+    
+    1. Перейти на план;
+    
+    2. Запустите плагин, выберите плиты перекрытий и выберите файл LandXML;
+    
+    3. По каждой грузовой площади пилона под плитами будет рассчитана усредненная толщина слоя БИО, которая будет записана в параметр "ФОП_Толщина БИО".
+    
+    
+    ВНИМАНИЕ!
+    
+    Для корректных данных необходимо:
+    
+    - настроить точку съемки в активном документе в соответствии с координатами ГП
+    
+    - в файле LandXml должна быть готовая разность поверхностей ГП и плиты перекрытия, а не абсолютные отметки поверхности ГП
+  en_us: >- 
+    Determines the average thickness of the bio-layer for the pylon loading areas.
+    To launch:
+    
+    1. Go to the plan;
+    
+    2. Run the plugin, select floors and select the LandXML file;
+    
+    3. The average land-layer thickness will be calculated for each pylon loading area and saved to the "ФОП_Толщина БИО" parameter.
+
+
+    ATTENTION!
+    
+    For accurate data, you must:
+    
+    - adjust the survey point in the active document to match the GP coordinates
+    
+    - the LandXml file must contain a ready-made surface difference between the GP and the floor slab, not absolute GP surface elevations
+
+assembly: RevitPylonLoadAreas.dll
+command_class: GetLandThicknessOnLoadAreaCommand
+
+author: vlastroG
+
+min_revit_version: 2022
+max_revit_version: 2024

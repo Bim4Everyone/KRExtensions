@@ -1,0 +1,31 @@
+title:
+  ru: "Грузовая\nплощадь"
+  en_us: "Load\narea"
+
+tooltip:
+  ru: >- 
+    Определяет грузовую площадь пилонов и стен.
+    Для запуска: 
+    
+    1. Перейти на план;
+    
+    2. Запустите плагин и выберите плиту перекрытия;
+    
+    3. По выбранной плите построятся цветовые области по контурам грузовых площадей. Значения площадей будут записаны в параметр "ФОП_Площадь грузовая"
+  en_us: >- 
+    Determines the loading area of pylons and walls.
+    To launch:
+    
+    1. Open a plan;
+    
+    2. Run the plugin and select a floor slab;
+    
+    3. Filled regions will be generated based on the selected slab's loading area contours. The area values will be written to the "ФОП_Площадь грузовая" parameter.
+
+assembly: RevitPylonLoadAreas.dll
+command_class: FindPylonLoadAreasCommand
+
+author: vlastroG
+
+min_revit_version: 2022
+max_revit_version: 2024
