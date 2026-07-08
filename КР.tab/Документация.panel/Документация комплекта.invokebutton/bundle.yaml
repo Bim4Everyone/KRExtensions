@@ -5,10 +5,10 @@ title:
 tooltip:
   ru: >- 
     Плагин предназначен для создания комплекта документации по заранее подготовленной конфигурации. 
-    Для испольования необходимо запустить плагин, найти и выбрать в проводнике подготовленную конфигурацию, отметить нужные листы и нажать Окей.
+    Для испольования необходимо запустить плагин, найти и выбрать в проводнике подготовленную конфигурацию JSON, отметить нужные листы и нажать Окей.
   en_us: >-
     The plugin is designed to create a documentation set for a pre-prepared configuration.
-    To use it, launch the plugin, find and select the pre-prepared configuration in the explorer, select the desired sheets, and click OK.
+    To use it, launch the plugin, find and select the pre-prepared JSON configuration in the explorer, select the desired sheets, and click OK.
 
 assembly: RevitPackageDocumentation.dll
 command_class: RevitPackageDocumentationCommand
