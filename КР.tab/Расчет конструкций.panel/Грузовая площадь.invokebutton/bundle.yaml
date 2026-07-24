@@ -20,7 +20,7 @@ tooltip:
     
     2. Run the plugin and select the Revit floor slab elements that form a single physical slab;
     
-    3. Colored areas will be generated for the selected slabs based on the contours of the loading areas. The area values will be written to the "ФОП_Площадь грузовая" parameter.
+    3. Filled regions will be generated for the selected slabs based on the contours of the loading areas. The area values will be written to the "ФОП_Площадь грузовая" parameter.
 
 assembly: RevitPylonLoadAreas.dll
 command_class: FindPylonLoadAreasCommand
