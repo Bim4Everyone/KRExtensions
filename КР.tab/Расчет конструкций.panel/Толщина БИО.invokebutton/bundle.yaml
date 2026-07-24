@@ -9,7 +9,7 @@ tooltip:
     
     1. Перейти на план;
     
-    2. Запустите плагин, выберите плиты перекрытий и выберите файл LandXML;
+    2. Запустите плагин и выберите элементы перекрытия Revit, которые являются одной физической плитой, затем выберите файл LandXML;
     
     3. По каждой грузовой площади пилона под плитами будет рассчитана усредненная толщина слоя БИО, которая будет записана в параметр "ФОП_Толщина БИО".
     
@@ -27,7 +27,7 @@ tooltip:
     
     1. Go to the plan;
     
-    2. Run the plugin, select floors and select the LandXML file;
+    2. Run the plugin and select the Revit floor slab elements that form a single physical slab, then select the LandXML file;
     
     3. The average land-layer thickness will be calculated for each pylon loading area and saved to the "ФОП_Толщина БИО" parameter.
 
