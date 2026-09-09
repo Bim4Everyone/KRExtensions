@@ -1,0 +1,17 @@
+title:
+  ru: СМП
+  en_us: CMP
+
+tooltip:
+  ru: Плагин выравнивет спецификации КМ заполняя параметры Изображение  и Изображение СМР. 
+      Запустите плагин. 
+      он автоматически обработает элементы КМ
+  en_us: The plugin will align the CM specifications by filling in the Image and Image parameters of the CMR. 
+      Launch the plugin. 
+      It will automatically process the KM elements.
+
+author: Voitenkov_d
+help_url: "https://kb.a101.ru/pages/viewpage.action?pageId=223838249"
+
+min_revit_version: 2020
+max_revit_version: 2024
