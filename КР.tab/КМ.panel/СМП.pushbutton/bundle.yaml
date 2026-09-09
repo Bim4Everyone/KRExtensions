@@ -1,6 +1,6 @@
 title:
   ru: СМП
-  en_us: CMP
+  en_us: SpecMetal
 
 tooltip:
   ru: Плагин выравнивет спецификации КМ заполняя параметры Изображение  и Изображение СМР. 
@@ -8,7 +8,7 @@ tooltip:
       он автоматически обработает элементы КМ
   en_us: The plugin will align the CM specifications by filling in the Image and Image parameters of the CMR. 
       Launch the plugin. 
-      It will automatically process the KM elements.
+      It will automatically process the MS elements.
 
 author: Voitenkov_d
 help_url: "https://kb.a101.ru/pages/viewpage.action?pageId=223838249"
