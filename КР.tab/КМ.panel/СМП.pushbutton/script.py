@@ -28,6 +28,8 @@ doc = __revit__.ActiveUIDocument.Document
 
 # ---------------- constants ----------------
 PARAM_KM_TYPE = "ADSK_Тип элемента КМ"
+PARAM_PROFILE_NAME = "ADSK_Наименование профиля"
+PARAM_NAME = "ADSK_Наименование"
 PARAM_IMAGE = "Изображение"
 PARAM_IMAGE_SMP = "Изображение для СМП"
 
@@ -185,27 +187,17 @@ class CmpProcessor:
 
         return filtered
 
-    def _group_by_family(self, elements):
+    def _group_by_profile(self, elements):
         groups = {}
         for e in elements:
-            type_id = e.GetTypeId()
-            if type_id == ElementId.InvalidElementId:
-                continue
+            profile_name = self._get_param_value(e, PARAM_PROFILE_NAME)
+            if profile_name is None or str(profile_name).strip() == "":
+                profile_name = "Unknown Profile"
 
-            elem_type = self.doc.GetElement(type_id)
-            if not elem_type:
-                continue
+            profile_name = str(profile_name).strip()
 
-            if hasattr(elem_type, "FamilyName") and elem_type.FamilyName:
-                fam_name = elem_type.FamilyName
-            else:
-                fam_name = elem_type.Name
-
-            if not fam_name:
-                fam_name = "Unknown Family"
-
-            groups.setdefault(fam_name, [])
-            groups[fam_name].append(e)
+            groups.setdefault(profile_name, [])
+            groups[profile_name].append(e)
 
         return groups
 
@@ -261,8 +253,8 @@ class CmpProcessor:
             plugin_logger.Warning("CMP: нет элементов для обработки")
             script.exit()
 
-        groups = self._group_by_family(filtered)
-        plugin_logger.Information("CMP: {} семейств".format(len(groups)))
+        groups = self._group_by_profile(filtered)
+        plugin_logger.Information("CMP: {} профилей".format(len(groups)))
 
         self._build_image_index()
         self._validate_images(plugin_logger)
@@ -279,12 +271,15 @@ class CmpProcessor:
         set_smp = 0
 
         with revit.Transaction("BIM: CMP — назначение изображений"):
-            for fam_name, elems in groups.items():
-                unique_type_ids = set()
+            for profile_name, elems in groups.items():
+                unique_names = set()
                 for e in elems:
-                    unique_type_ids.add(e.GetTypeId().IntegerValue)
+                    name_value = self._get_param_value(e, PARAM_NAME)
+                    if name_value is None or str(name_value).strip() == "":
+                        continue
+                    unique_names.add(str(name_value).strip())
 
-                type_count = len(unique_type_ids)
+                type_count = len(unique_names)
                 lvl = max(1, min(type_count, 20))
                 img_id_for_group = level_to_img_id[lvl]
 
@@ -304,7 +299,7 @@ class CmpProcessor:
         output = script.get_output()
         output.print_md("**CMP: результаты**")
         output.print_md("- Элементов обработано: {}".format(len(filtered)))
-        output.print_md("- Семейств: {}".format(len(groups)))
+        output.print_md("- Профилей: {}".format(len(groups)))
         output.print_md("- Назначено / Проверено '{}': {}".format(PARAM_IMAGE, set_img))
         output.print_md("- Назначено / Проверено '{}': {}".format(PARAM_IMAGE_SMP, set_smp))
 
