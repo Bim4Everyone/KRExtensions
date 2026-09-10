@@ -125,7 +125,7 @@ class CmpProcessor:
             output.print_md("")
             output.print_md("**Доступные имена изображений (первые 60):**")
             output.print_md(", ".join(preview) if preview else "(нет)")
-            plugin_logger.error("Не найдено изображений для уровней: {}".format(missing))
+            plugin_logger.Error("Не найдено изображений для уровней: {}".format(missing))
             script.exit()
 
     # ---- сбор и фильтрация элементов ----
@@ -250,19 +250,19 @@ class CmpProcessor:
     # ---- главный метод ----
 
     def execute(self, plugin_logger):
-        plugin_logger.info("CMP: Сбор элементов...")
+        plugin_logger.Information("CMP: Сбор элементов...")
 
         filtered = self._collect_filtered_elements()
-        plugin_logger.info("CMP: Найдено {} отфильтрованных элементов".format(len(filtered)))
+        plugin_logger.Information("CMP: Найдено {} отфильтрованных элементов".format(len(filtered)))
 
         if not filtered:
             output = script.get_output()
             output.print_md("**Не найдено элементов с заполненным параметром '{}'**".format(PARAM_KM_TYPE))
-            plugin_logger.warning("CMP: нет элементов для обработки")
+            plugin_logger.Warning("CMP: нет элементов для обработки")
             script.exit()
 
         groups = self._group_by_family(filtered)
-        plugin_logger.info("CMP: {} семейств".format(len(groups)))
+        plugin_logger.Information("CMP: {} семейств".format(len(groups)))
 
         self._build_image_index()
         self._validate_images(plugin_logger)
@@ -318,7 +318,7 @@ class CmpProcessor:
         else:
             output.print_md("Ошибок нет.")
 
-        plugin_logger.info("CMP: Завершено. Изображение — {}, СМП — {}".format(set_img, set_smp))
+        plugin_logger.Information("CMP: Завершено. Изображение — {}, СМП — {}".format(set_img, set_smp))
 
 
 @notification()
