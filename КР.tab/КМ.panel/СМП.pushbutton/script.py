@@ -1,16 +1,11 @@
 # -*- coding: utf-8 -*-
-import os
-import sys
 import clr
 import re
 
-sys.path.append(os.path.join(os.getenv("APPDATA"), r"pyRevit\Extensions\BIM4Everyone.lib"))
-import dosymep_libs
-
-dosymep_libs.load_assemblies()
-
 clr.AddReference("dosymep.Revit.dll")
 clr.AddReference("dosymep.Bim4Everyone.dll")
+
+from System.Collections.Generic import List
 
 from pyrevit import EXEC_PARAMS, revit
 from pyrevit import script
@@ -26,201 +21,179 @@ from dosymep_libs.bim4everyone import *
 
 doc = __revit__.ActiveUIDocument.Document
 
-# ---------------- constants ----------------
+# ---------------- константы ----------------
 PARAM_KM_TYPE = "ADSK_Тип элемента КМ"
 PARAM_PROFILE_NAME = "ADSK_Наименование профиля"
 PARAM_NAME = "ADSK_Наименование"
 PARAM_IMAGE = "Изображение"
 PARAM_IMAGE_SMP = "Изображение для СМП"
 
-BUILT_IN_CATS = [
+UNKNOWN_PROFILE_NAME = "Профиль не указан"
+
+BUILT_IN_CATEGORIES = [
     BuiltInCategory.OST_StructuralColumns,
     BuiltInCategory.OST_StructuralFraming,
     BuiltInCategory.OST_GenericModel,
     BuiltInCategory.OST_StructConnections,
 ]
 
-LEVEL_TO_IMAGE_NAME = {
+# Номер изображения = количество разных наименований в профиле.
+# Изображения подготовлены для 1–20 наименований (полоса растёт с шагом 8 мм),
+# если наименований больше, используется самое широкое изображение.
+TYPE_COUNT_TO_IMAGE_NAME = {
     1:  "8 мм.png",   2:  "16 мм.png",  3:  "24 мм.png",  4:  "32 мм.png",
     5:  "40 мм.png",  6:  "48 мм.png",  7:  "56 мм.png",  8:  "64 мм.png",
     9:  "72 мм.png",  10: "80 мм.png",  11: "88 мм.png",  12: "96 мм.png",
     13: "104 мм.png", 14: "112 мм.png", 15: "120 мм.png", 16: "128 мм.png",
     17: "136 мм.png", 18: "144 мм.png", 19: "152 мм.png", 20: "160 мм.png",
 }
+MIN_TYPE_COUNT = min(TYPE_COUNT_TO_IMAGE_NAME)
+MAX_TYPE_COUNT = max(TYPE_COUNT_TO_IMAGE_NAME)
+
+# Сколько имён изображений из модели показывать в отчёте, если нужных не нашлось
+IMAGE_NAMES_PREVIEW_LIMIT = 60
 
 
 class CmpProcessor:
     def __init__(self, doc):
         self.doc = doc
-        self.__img_by_norm = {}
+        self.__image_types_by_name = {}
         self.__errors = dict()
 
     @staticmethod
-    def _norm(s):
-        if s is None:
+    def _normalize_name(name):
+        if name is None:
             return None
-        s = s.strip().lower().replace(u"\u00A0", u" ")
-        return re.sub(r"\s+", " ", s)
+        name = name.strip().lower().replace(u" ", u" ")
+        return re.sub(r"\s+", " ", name)
 
     # ---- поиск изображений ----
 
-    def _get_image_name(self, img_type):
+    def _get_image_name(self, image_type):
         try:
-            n = img_type.Name
-            if n:
-                return n
+            image_name = image_type.Name
+            if image_name:
+                return image_name
         except Exception:
             pass
 
-        try:
-            p = img_type.get_Parameter(BuiltInParameter.ALL_MODEL_TYPE_NAME)
-            if p:
-                n = p.AsString() or p.AsValueString()
-                if n:
-                    return n
-        except Exception:
-            pass
-
-        return None
+        return image_type.GetParamValueOrDefault(BuiltInParameter.ALL_MODEL_TYPE_NAME)
 
     def _build_image_index(self):
-        image_types = list(FilteredElementCollector(self.doc).OfClass(ImageType).ToElements())
-        for it in image_types:
-            nm = self._get_image_name(it)
-            if nm:
-                self.__img_by_norm[self._norm(nm)] = it
+        image_types = FilteredElementCollector(self.doc).OfClass(ImageType).ToElements()
+        for image_type in image_types:
+            image_name = self._get_image_name(image_type)
+            if image_name:
+                self.__image_types_by_name[self._normalize_name(image_name)] = image_type
 
-    def _find_image_type_id(self, level):
-        target = LEVEL_TO_IMAGE_NAME.get(level)
-        if not target:
+    def _find_image_type_id(self, type_count):
+        target_name = TYPE_COUNT_TO_IMAGE_NAME.get(type_count)
+        if not target_name:
             return None
 
-        tnorm = self._norm(target)
+        normalized_name = self._normalize_name(target_name)
 
-        if tnorm in self.__img_by_norm:
-            return self.__img_by_norm[tnorm].Id
+        if normalized_name in self.__image_types_by_name:
+            return self.__image_types_by_name[normalized_name].Id
 
-        if tnorm.endswith(".png"):
-            t2 = tnorm[:-4]
-            if t2 in self.__img_by_norm:
-                return self.__img_by_norm[t2].Id
+        name_without_extension = normalized_name.replace(".png", "")
+        if name_without_extension in self.__image_types_by_name:
+            return self.__image_types_by_name[name_without_extension].Id
 
-        key = tnorm.replace(".png", "")
-        for k, it in self.__img_by_norm.items():
-            if k and key in k:
-                return it.Id
+        for image_name, image_type in self.__image_types_by_name.items():
+            if image_name and name_without_extension in image_name:
+                return image_type.Id
 
         return None
 
-    def _validate_images(self, plugin_logger):
-        missing = []
-        for lvl in sorted(LEVEL_TO_IMAGE_NAME.keys()):
-            img_id = self._find_image_type_id(lvl)
-            if img_id is None:
-                missing.append(LEVEL_TO_IMAGE_NAME[lvl])
+    def _get_image_ids_by_type_count(self):
+        image_ids = {}
+        missing_names = []
+        for type_count in sorted(TYPE_COUNT_TO_IMAGE_NAME.keys()):
+            image_id = self._find_image_type_id(type_count)
+            if image_id is None:
+                missing_names.append(TYPE_COUNT_TO_IMAGE_NAME[type_count])
+            else:
+                image_ids[type_count] = image_id
 
-        if missing:
-            preview = sorted(self.__img_by_norm.keys())[:60]
+        if missing_names:
+            available_names = sorted(self.__image_types_by_name.keys())[:IMAGE_NAMES_PREVIEW_LIMIT]
             output = script.get_output()
-            output.print_md("**Ошибка: не найдены изображения для уровней:**")
-            output.print_md(", ".join(missing))
+            output.print_md("**Ошибка: в модели не найдены изображения:**")
+            output.print_md(", ".join(missing_names))
             output.print_md("")
-            output.print_md("**Доступные имена изображений (первые 60):**")
-            output.print_md(", ".join(preview) if preview else "(нет)")
-            plugin_logger.Error("Не найдено изображений для уровней: {}".format(missing))
+            output.print_md("**Доступные имена изображений (первые {}):**".format(IMAGE_NAMES_PREVIEW_LIMIT))
+            output.print_md(", ".join(available_names) if available_names else "(нет)")
             script.exit()
+
+        return image_ids
 
     # ---- сбор и фильтрация элементов ----
 
-    def _lookup_param(self, elem, param_name):
-        p = elem.LookupParameter(param_name)
-        if p:
-            return p
+    def _get_text_value(self, element, param_name):
+        """Значение параметра экземпляра, а если его нет — параметра типа."""
+        value = element.GetParamValueOrDefault(param_name)
+        if value is None:
+            element_type = self.doc.GetElement(element.GetTypeId())
+            if element_type:
+                value = element_type.GetParamValueOrDefault(param_name)
 
-        try:
-            type_id = elem.GetTypeId()
-            if type_id and type_id != ElementId.InvalidElementId:
-                elem_type = self.doc.GetElement(type_id)
-                if elem_type:
-                    return elem_type.LookupParameter(param_name)
-        except Exception:
-            pass
-
-        return None
-
-    def _get_param_value(self, elem, param_name):
-        p = self._lookup_param(elem, param_name)
-        if not p:
-            return None
-
-        st = p.StorageType
-        if st == StorageType.String:
-            return p.AsString() or p.AsValueString()
-        if st == StorageType.Integer:
-            return p.AsInteger()
-        if st == StorageType.Double:
-            return p.AsDouble()
-        if st == StorageType.ElementId:
-            eid = p.AsElementId()
-            return eid.IntegerValue if eid else None
-        return p.AsValueString()
+        if value is None:
+            return ""
+        return str(value).strip()
 
     def _collect_filtered_elements(self):
-        seen = set()
-        all_elems = []
+        category_filter = ElementMulticategoryFilter(List[BuiltInCategory](BUILT_IN_CATEGORIES))
+        elements = FilteredElementCollector(self.doc) \
+            .WherePasses(category_filter) \
+            .WhereElementIsNotElementType() \
+            .ToElements()
 
-        for bic in BUILT_IN_CATS:
-            col = FilteredElementCollector(self.doc).OfCategory(bic).WhereElementIsNotElementType()
-            for e in col:
-                iid = e.Id.IntegerValue
-                if iid in seen:
-                    continue
-                seen.add(iid)
-                all_elems.append(e)
-
-        filtered = []
-        for e in all_elems:
-            km = self._get_param_value(e, PARAM_KM_TYPE)
-            if km is None or str(km).strip() == "":
-                continue
-            filtered.append(e)
-
-        return filtered
+        return [element for element in elements if self._get_text_value(element, PARAM_KM_TYPE)]
 
     def _group_by_profile(self, elements):
         groups = {}
-        for e in elements:
-            profile_name = self._get_param_value(e, PARAM_PROFILE_NAME)
-            if profile_name is None or str(profile_name).strip() == "":
-                profile_name = "Unknown Profile"
-
-            profile_name = str(profile_name).strip()
+        for element in elements:
+            profile_name = self._get_text_value(element, PARAM_PROFILE_NAME)
+            if not profile_name:
+                profile_name = UNKNOWN_PROFILE_NAME
 
             groups.setdefault(profile_name, [])
-            groups[profile_name].append(e)
+            groups[profile_name].append(element)
 
         return groups
 
     # ---- назначение параметров ----
 
-    def _set_image_param(self, elem, param_name, image_type_id):
-        p = self._lookup_param(elem, param_name)
-        if not p:
+    def _find_parameter(self, element, param_name):
+        parameter = element.LookupParameter(param_name)
+        if parameter:
+            return parameter
+
+        element_type = self.doc.GetElement(element.GetTypeId())
+        if element_type:
+            return element_type.LookupParameter(param_name)
+
+        return None
+
+    def _set_image_param(self, element, param_name, image_type_id):
+        parameter = self._find_parameter(element, param_name)
+        if not parameter:
             return None
 
-        if p.IsReadOnly:
-            return "read-only"
-        if p.StorageType != StorageType.ElementId:
-            return "wrong StorageType: {}".format(p.StorageType)
+        if parameter.IsReadOnly:
+            return "параметр только для чтения"
+        if parameter.StorageType != StorageType.ElementId:
+            return "неверный тип данных параметра: {}".format(parameter.StorageType)
 
-        current_id = p.AsElementId()
-        if current_id and current_id.IntegerValue == image_type_id.IntegerValue:
+        current_id = parameter.AsElementId()
+        if current_id and current_id.GetIdValue() == image_type_id.GetIdValue():
             return None
 
         try:
-            p.Set(image_type_id)
-        except Exception as e:
-            return str(e)
+            parameter.Set(image_type_id)
+        except Exception as ex:
+            return str(ex)
 
         return None
 
@@ -233,75 +206,61 @@ class CmpProcessor:
 
     def _get_error_list(self):
         result = []
-        for error_key, ids in self.__errors.items():
+        for error_key, element_ids in self.__errors.items():
             parts = error_key.split("___")
-            parts.append(", ".join(ids))
+            parts.append(", ".join(element_ids))
             result.append(parts)
         return result
 
     # ---- главный метод ----
 
-    def execute(self, plugin_logger):
-        plugin_logger.Information("CMP: Сбор элементов...")
+    def execute(self):
+        filtered_elements = self._collect_filtered_elements()
 
-        filtered = self._collect_filtered_elements()
-        plugin_logger.Information("CMP: Найдено {} отфильтрованных элементов".format(len(filtered)))
-
-        if not filtered:
+        if not filtered_elements:
             output = script.get_output()
             output.print_md("**Не найдено элементов с заполненным параметром '{}'**".format(PARAM_KM_TYPE))
-            plugin_logger.Warning("CMP: нет элементов для обработки")
             script.exit()
 
-        groups = self._group_by_profile(filtered)
-        plugin_logger.Information("CMP: {} профилей".format(len(groups)))
+        groups = self._group_by_profile(filtered_elements)
 
         self._build_image_index()
-        self._validate_images(plugin_logger)
+        image_ids_by_type_count = self._get_image_ids_by_type_count()
+        smp_image_id = image_ids_by_type_count[MIN_TYPE_COUNT]
 
-        level_to_img_id = {}
-        for lvl in sorted(LEVEL_TO_IMAGE_NAME.keys()):
-            img_id = self._find_image_type_id(lvl)
-            if img_id is not None:
-                level_to_img_id[lvl] = img_id
+        image_set_count = 0
+        smp_image_set_count = 0
 
-        img_id_smp = level_to_img_id[1]
-
-        set_img = 0
-        set_smp = 0
-
-        with revit.Transaction("BIM: CMP — назначение изображений"):
-            for profile_name, elems in groups.items():
+        with revit.Transaction("BIM: СМП — назначение изображений"):
+            for profile_elements in groups.values():
                 unique_names = set()
-                for e in elems:
-                    name_value = self._get_param_value(e, PARAM_NAME)
-                    if name_value is None or str(name_value).strip() == "":
-                        continue
-                    unique_names.add(str(name_value).strip())
+                for element in profile_elements:
+                    name_value = self._get_text_value(element, PARAM_NAME)
+                    if name_value:
+                        unique_names.add(name_value)
 
-                type_count = len(unique_names)
-                lvl = max(1, min(type_count, 20))
-                img_id_for_group = level_to_img_id[lvl]
+                type_count = max(MIN_TYPE_COUNT, min(len(unique_names), MAX_TYPE_COUNT))
+                group_image_id = image_ids_by_type_count[type_count]
 
-                for e in elems:
-                    err = self._set_image_param(e, PARAM_IMAGE, img_id_for_group)
-                    if err:
-                        self._add_error("Назначение изображения", e, PARAM_IMAGE)
+                for element in profile_elements:
+                    error = self._set_image_param(element, PARAM_IMAGE, group_image_id)
+                    if error:
+                        self._add_error("Назначение изображения: " + error, element, PARAM_IMAGE)
                     else:
-                        set_img += 1
+                        image_set_count += 1
 
-                    err2 = self._set_image_param(e, PARAM_IMAGE_SMP, img_id_smp)
-                    if err2:
-                        self._add_error("Назначение изображения для СМП", e, PARAM_IMAGE_SMP)
+                    error = self._set_image_param(element, PARAM_IMAGE_SMP, smp_image_id)
+                    if error:
+                        self._add_error("Назначение изображения для СМП: " + error, element, PARAM_IMAGE_SMP)
                     else:
-                        set_smp += 1
+                        smp_image_set_count += 1
 
         output = script.get_output()
-        output.print_md("**CMP: результаты**")
-        output.print_md("- Элементов обработано: {}".format(len(filtered)))
+        output.print_md("**СМП: результаты**")
+        output.print_md("- Элементов обработано: {}".format(len(filtered_elements)))
         output.print_md("- Профилей: {}".format(len(groups)))
-        output.print_md("- Назначено / Проверено '{}': {}".format(PARAM_IMAGE, set_img))
-        output.print_md("- Назначено / Проверено '{}': {}".format(PARAM_IMAGE_SMP, set_smp))
+        output.print_md("- Назначено / Проверено '{}': {}".format(PARAM_IMAGE, image_set_count))
+        output.print_md("- Назначено / Проверено '{}': {}".format(PARAM_IMAGE_SMP, smp_image_set_count))
 
         errors_list = self._get_error_list()
         if errors_list:
@@ -313,14 +272,12 @@ class CmpProcessor:
         else:
             output.print_md("Ошибок нет.")
 
-        plugin_logger.Information("CMP: Завершено. Изображение — {}, СМП — {}".format(set_img, set_smp))
-
 
 @notification()
 @log_plugin(EXEC_PARAMS.command_name)
 def script_execute(plugin_logger):
     processor = CmpProcessor(doc)
-    processor.execute(plugin_logger)
+    processor.execute()
 
 
 script_execute()
