@@ -1,22 +1,26 @@
 title:
   ru: Проверка ВОР
-  en_us: Проверка ВОР
+  en_us: VOR check
 
 tooltip:
-  ru: >- 
-    Плагин делает это
-    Для запуска: 
-    
-    1. Запустить плагин;
-    
-    2. Нажать ОК;
-  en_us: >- 
-    Plugin does this
-    How to use:
-    
-    1. Start the plugin;
-    
-    2. Press OK;
+  ru: >-
+    Проверяет BIM-модели КР перед выгрузкой ВОР и формирует реестр замечаний .docx.
+
+    1. Указать папку с моделями КР и выгрузками ВОР (Excel), заполнить данные проекта из ЗнП;
+
+    2. Нажать «Запустить проверку».
+
+    Модели открываются в фоне отсоединёнными и закрываются без сохранения.
+    Реестр и журнал сохраняются в подпапку «Локальная проверка» папки с моделями.
+  en_us: >-
+    Checks structural BIM models before the bill of quantities export and builds a findings register (.docx).
+
+    1. Select the folder with the models and the BoQ exports (Excel), fill in the project data;
+
+    2. Press "Run check".
+
+    Models are opened detached in the background and closed without saving.
+    The register and the log are saved to the "Локальная проверка" subfolder of the models folder.
 
 assembly: RevitVORChecker.dll
 command_class: RevitVORCheckerCommand
