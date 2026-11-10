@@ -1,0 +1,19 @@
+title:
+  ru: "Поперечное\nармирование"
+  en_us: "Punching\nrebar"
+
+tooltip:
+  ru: >-
+    Автоматическая расстановка каркасов поперечного армирования в фундаментных плитах и плитах перекрытия у выбранных пилонов.
+    Выберите пилоны из текущей модели и/или связанных файлов, выберите горизонтальную плиту, задайте параметры армирования и нажмите ОК.
+  en_us: >-
+    Automatically places punching shear reinforcement frames around selected pylons in foundation slabs and floor slabs.
+    Select pylons from the current model and/or linked files, select a horizontal slab, configure reinforcement settings, and click OK.
+
+assembly: RevitPunchingRebar.dll
+command_class: RevitPunchingRebarCommand
+
+author: OlegRybkin, DivinN
+
+min_revit_version: 2022
+max_revit_version: 2024
